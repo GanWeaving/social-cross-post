@@ -1,0 +1,115 @@
+/* style.css */
+
+body {
+    font-family: 'Roboto', Arial, sans-serif;
+    padding: 20px;
+    margin: 0;
+    background-color: #332f2f;
+    color: #333;
+}
+
+.container {
+    max-width: calc(100% - 40px);
+    width: 100%;
+    margin: 20px auto;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+textarea, input[type="text"], input[type="file"] {
+    width: 100%;
+    padding: 15px;
+    margin-bottom: 10px;
+    font-size: 1em;
+    box-sizing: border-box;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+input[type="submit"] {
+    background-color: #333;
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+input[type="submit"]:hover {
+    background-color: #555;
+}
+
+.thumbnail {
+    max-width: 100px;
+    max-height: 100px;
+    vertical-align: middle;
+    border-radius: 4px;
+}
+
+.file-row {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    margin-bottom: 20px;
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.file-info img {
+    margin-right: 10px;
+    border-radius: 4px;
+}
+
+form {
+    width: 100%;
+}
+
+p, label {
+    font-size: 0.9em;
+    color: #777;
+}
+
+@media screen and (max-width: 600px) {
+    body {
+        padding: 10px 0;
+    }
+
+    .file-info img {
+        margin-bottom: 10px;
+        margin-right: 0;
+    }
+
+    .thumbnail {
+        max-width: 80px;
+        max-height: 80px;
+    }
+
+    .file-row, .file-info {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+
+@media screen and (min-width: 601px) {
+    .container {
+        max-width: 600px;
+        margin: 20px auto;
+    }
+}
+
+.dragging {
+    opacity: 0.4;
+}
+
+.over {
+    border: 2px dashed #000;
+}
+
+/*  * {
+    outline: 1px solid red;
+}
+*/

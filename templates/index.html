@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My Own Little Crossposter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+</head>
+<body>
+    <div class="container">
+        <form action="/submit" method="POST" enctype="multipart/form-data" onsubmit="disableSubmitButton()">
+            <h2>My Own Little Cross-Poster</h2>
+            <textarea id="text" name="text" required oninput="updateCharacterCount()"></textarea><br>
+            <p>Character count: <span id="characterCount">0</span></p>
+
+            <input type="checkbox" id="hashtagCheckbox" name="hashtagCheckbox" checked onclick="updateCharacterCount()">
+            <label for="hashtagCheckbox">add hashtags?</label><br><br>
+            <input type="text" id="txt_hashtags" name="txt_hashtags" value="#midjourney #aiart #aiartcommunity" oninput="updateCharacterCount()">         
+
+            <input type="checkbox" id="altCheckbox" name="altCheckbox" value="[alt in the prompt]" checked onclick="updateCharacterCount()">
+            <label for="altCheckbox">add [prompt in alt]?</label><br><br>
+
+            <input type="file" id="files" name="files" multiple accept="image/*" onchange="handleFiles(this.files)"><br>
+            <div id="fileList"></div>
+            
+            <input type="submit" id="submitButton" value="Submit">
+        </form>
+    </div>
+
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul class=flashes>
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+        {% endwith %}
+    </div>
+</body>
+</html>
