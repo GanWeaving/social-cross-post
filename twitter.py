@@ -28,21 +28,27 @@ client = Client(
 )
 
 def upload_to_twitter(processed_files, alt_texts, text):
-    media_ids = []
-    for filepath, alt_text in zip(processed_files, alt_texts):
-        # get media id
-        #logger.debug(f"Uploading file: {filepath[0]}")
-        media_id = upload_local_image(filepath[0], twitter_config, alt_text)
-        #logger.debug(f"Uploaded file: {filepath[0]}, Media ID: {media_id}")
-        media_ids.append(media_id)
-    
-    tweet_text = helpers.strip_html_tags(text)  # Customize as required
-    tweet_text = text.replace("[prompt in the alt]", "[prompts over on Bluesky & Mastodon]")  # Replace the string
-    logger.debug(f"Creating tweet: {tweet_text}")
-    res = client.create_tweet(text=tweet_text, media_ids=media_ids)
-    logger.debug(f"Posted to Twitter with response: {res}")
-    return res
-
+    if processed_files:  
+        media_ids = []
+        for filepath, alt_text in zip(processed_files, alt_texts):
+            # get media id
+            media_id = upload_local_image(filepath[0], twitter_config, alt_text)
+            logger.debug(f"Uploaded file: {filepath[0]}, Media ID: {media_id}")
+            media_ids.append(media_id)
+        
+        tweet_text = helpers.strip_html_tags(text)  # Customize as required
+        tweet_text = text.replace("[prompt in the alt]", "[prompts over on Bluesky & Mastodon]")  # Replace the string
+        logger.debug(f"Creating tweet: {tweet_text}")
+        res = client.create_tweet(text=tweet_text, media_ids=media_ids)
+        logger.debug(f"Posted to Twitter with response: {res}")
+        return res
+    else:
+        tweet_text = helpers.strip_html_tags(text)
+        tweet_text = text.replace("[prompt in the alt]", "[prompts over on Bluesky & Mastodon]")
+        logger.debug(f"Creating tweet: {tweet_text}")
+        res = client.create_tweet(text=tweet_text)
+        logger.debug(f"Posted to Twitter with response: {res}")
+        return res
 
 def upload_local_image(filepath, config, alt_text):
     # Endpoint URL

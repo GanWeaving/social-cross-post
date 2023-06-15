@@ -52,15 +52,10 @@ function updateCharacterCount() {
     var textarea = document.getElementById('text');
     var hashtagField = document.getElementById('txt_hashtags');
     var hashtagCheckbox = document.getElementById('hashtagCheckbox');
-    var altCheckbox = document.getElementById('altCheckbox');
     var characterCount = textarea.value.length;
     if (hashtagCheckbox.checked) {
         characterCount += hashtagField.value.length;
     }
-    if (altCheckbox.checked) {
-        characterCount += altCheckbox.value.length;
-    }
-
     var counter = document.getElementById('characterCount');
     counter.textContent = characterCount;
 }

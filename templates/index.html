@@ -19,8 +19,20 @@
             <label for="hashtagCheckbox">add hashtags?</label><br><br>
             <input type="text" id="txt_hashtags" name="txt_hashtags" value="#midjourney #aiart #aiartcommunity" oninput="updateCharacterCount()">         
 
-            <input type="checkbox" id="altCheckbox" name="altCheckbox" value="[alt in the prompt]" checked onclick="updateCharacterCount()">
-            <label for="altCheckbox">add [prompt in alt]?</label><br><br>
+            <input type="checkbox" id="chkBS" name="chkBS" checked>
+            <label for="chkBS">enable Bluesky</label><br><br>
+
+            <input type="checkbox" id="chkMS" name="chkMS" checked>
+            <label for="chkMS">enable Mastodon</label><br><br>
+
+            <input type="checkbox" id="chkPH" name="chkPH" checked>
+            <label for="chkPH">enable Posthaven</label><br><br>
+
+            <input type="checkbox" id="chkIG" name="chkIG">
+            <label for="chkIG">enable Instagram</label><br><br>
+
+            <input type="checkbox" id="chkTW" name="chkTW" checked>
+            <label for="chkTW">enable Twitter</label><br><br>
 
             <input type="file" id="files" name="files" multiple accept="image/*" onchange="handleFiles(this.files)"><br>
             <div id="fileList"></div>
