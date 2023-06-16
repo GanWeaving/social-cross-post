@@ -33,7 +33,7 @@ def upload_to_twitter(processed_files, alt_texts, text):
         for filepath, alt_text in zip(processed_files, alt_texts):
             # get media id
             media_id = upload_local_image(filepath[0], twitter_config, alt_text)
-            logger.debug(f"Uploaded file: {filepath[0]}, Media ID: {media_id}")
+            #logger.debug(f"Uploaded file: {filepath[0]}, Media ID: {media_id}")
             media_ids.append(media_id)
         
         tweet_text = helpers.strip_html_tags(text)  # Customize as required

@@ -17,6 +17,7 @@ def login_to_bluesky():
         logger.error(f"Failed to log in to Bluesky: {e}")
 
 def post_to_bluesky(text, processed_files, alt_texts):
+    login_to_bluesky()
     text = helpers.strip_html_tags(text)
     logger.debug(f"Stripped text: {text}")
     

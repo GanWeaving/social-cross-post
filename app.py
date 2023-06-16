@@ -14,13 +14,8 @@ import bluesky
 import instagram
 import masto
 import twitter
+import facebook
 from config import Config, MYPASSWORD
-
-enable_twitter = False
-enable_instagram = True
-enable_posthaven = False
-enable_bluesky = False
-enable_mastodon = False
 
 # Get the filename of the current module
 logname = os.path.splitext(os.path.basename(__file__))[0]
@@ -139,6 +134,7 @@ def submit_form():
     enable_posthaven = request.form.get('chkPH') == 'on'
     enable_bluesky = request.form.get('chkBS') == 'on'
     enable_mastodon = request.form.get('chkMS') == 'on'
+    enable_facebook = request.form.get('chkFB') == 'on'
    
     # Process files and send email
     try:
@@ -149,47 +145,71 @@ def submit_form():
                 if textOnly: processed_files = []
                 twitter.upload_to_twitter(processed_files, processed_alt_texts, text_mastodon)
                 logger.debug('Posting to Twitter completed')
+                flash('Successfully posted to Twitter')
                 success_messages.append('Twitter')
             except Exception as e:
                 logger.error('Failed to post to Twitter. Error: %s', e)
+                flash('Failed to post to Twitter. Error: {e}')
                 error_messages.append('Twitter')
                 
         if enable_instagram: 
             try:
-                logger.debug('Image locations: %s', image_locations)
+                #logger.debug('Image locations: %s', image_locations)
                 instagram.postInstagramCarousel(image_locations, text)
                 logger.debug('Posting to Instagram completed')
+                flash('Successfully posted to Instagram')
                 success_messages.append('Instagram')
             except Exception as e:
                 logger.error('Failed to post to Instagram. Error: %s', e)
+                flash('Failed to post to Instagram. Error: {e}')
                 error_messages.append('Instagram')
+
+        if enable_facebook: 
+            try:
+                #logger.debug('Image locations: %s', image_locations)
+                facebook.post_to_facebook(image_locations, text_mastodon)
+                logger.debug('Posting to Facebook completed')
+                flash('Successfully posted to Facebook')
+                success_messages.append('Facebook')
+            except Exception as e:
+                logger.error('Failed to post to Instagram. Error: %s', e)
+                flash('Failed to post to Instagram. Error: {e}')
+                error_messages.append('Instagram')
+
         if enable_posthaven:
             try:
                 logger.debug('Sending email: %s', ', '.join(filename for filename, _ in processed_files))
                 posthaven.send_email_with_attachments(subject, text, processed_files, processed_alt_texts)
                 logger.debug('Sending email completed')
+                flash('Successfully posted to Posthaven')
                 success_messages.append('Posthaven')
             except Exception as e:
                 logger.error('Failed to send email. Error: %s', e)
+                flash('Failed to post to Posthaven. Error: {e}')
                 error_messages.append('Posthaven')
         if enable_mastodon:
             try:
                 logger.debug('Posting to Mastodon: %s', ', '.join(filename for filename, _ in processed_files))
                 masto.post_to_mastodon(subject, text_mastodon, processed_files, processed_alt_texts)
                 logger.debug('Posting to Mastodon completed')
+                flash('Successfully posted to Mastodon')
                 success_messages.append('Mastodon')
             except Exception as e:
                 logger.error('Failed to post to Mastodon. Error: %s', e)
+                flash('Failed to post to Mastodon. Error: {e}')
                 error_messages.append('Mastodon')
         if enable_bluesky:
             try:
                 logger.debug('Posting to Bluesky: %s', ', '.join(filename for filename, _ in processed_files))
                 bluesky.post_to_bluesky(text_mastodon, processed_files, processed_alt_texts)
                 logger.debug('Posting to Bluesky completed')
+                flash('Successfully posted to Bluesky')
                 success_messages.append('Bluesky')
             except Exception as e:
                 logger.error('Failed to post to Bluesky. Error: %s', e)
                 error_messages.append('Bluesky')
+                flash('Failed to post to Bluesky. Error: {e}')
+
         helpers.delete_media_files_in_directory('.')
         helpers.delete_media_files_in_directory('temp')
         
