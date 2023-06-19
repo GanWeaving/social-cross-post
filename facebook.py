@@ -27,15 +27,22 @@ def upload_images_to_fb(image_locations):
             logger.info(f"Image uploaded successfully: {image_location}")
             photo_id = json.loads(r.text)['id']
             uploaded_photo_ids.append(photo_id)
+            logger.debug(f"uploaded photo id: {photo_id}")
         else:
             logger.error(f"Failed to upload image: {image_location}. Error: {r.text}")
-        logger.error(f"uploaded photos ids: {uploaded_photo_ids}")
     return uploaded_photo_ids
 
-def post_to_facebook(image_locations, text):
+
+def post_to_facebook(image_locations, text, alt_texts):
+    # Append alt texts to the text
+    if alt_texts:
+        text = text.replace("[prompt in the alt]", "[image prompts below]")  # Remove the placeholder line
+        for alt_text in alt_texts:
+            if alt_text:  # Check if alt_text is not empty
+                text += '\n\n' + alt_text
 
     uploaded_photo_ids = upload_images_to_fb(image_locations)
-    
+
     # Create a multi-photo post
     feed_url = f"https://graph.facebook.com/{page_id}/feed"
     feed_payload = {
@@ -52,4 +59,3 @@ def post_to_facebook(image_locations, text):
     else:
         logger.error(f"Failed to publish post. Error: {r.text}")
         return False
-

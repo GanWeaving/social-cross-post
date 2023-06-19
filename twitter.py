@@ -61,7 +61,7 @@ def upload_local_image(filepath, config, alt_text):
         logger.error(f"Failed to open file {filepath}. Exception: {e}")
         raise
 
-    logger.debug(f'Opened file {filepath}.')
+    #logger.debug(f'Opened file {filepath}.')
     
     # Additional parameters
     params = {'media_category': 'TWEET_IMAGE'}

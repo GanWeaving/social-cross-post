@@ -39,5 +39,10 @@ def send_email_with_attachments(subject, body, processed_files, alt_texts):
             server.starttls()
             server.login(FASTMAIL_USERNAME, FASTMAIL_PASSWORD)
             server.sendmail(FASTMAIL_USERNAME, EMAIL_RECIPIENTS, msg.as_string())
-    except Exception as e:
+    except smtplib.SMTPResponseException as e:
+        if e.smtp_code == 250:  # Email was sent successfully
+            logger.info(f"Email sent successfully. Response: {e.smtp_error}")
+        else:  # There was a problem
+            logger.exception(f"Failed to send email. Error: {e.smtp_error}")
+    except Exception as e:  # Some other exception occurred
         logger.exception(f"Failed to send email. Error: {e}")

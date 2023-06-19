@@ -36,12 +36,19 @@ app = Flask(__name__)
 app.config.from_object(Config)
 Session(app)
 
+@app.errorhandler(502)
+def handle_bad_gateway_error(e):
+    logger.error('Bad Gateway error: %s', str(e))
+    logger.error('Request data: %s', request.data)
+    return 'Bad Gateway', 502
+
 @app.route('/')
 def index():
+    version = app.config['VERSION']
     logger.info('Index page loaded')
     if 'logged_in' not in session:
         return redirect(url_for('login'))
-    return render_template('index.html')
+    return render_template('index.html', version=version)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -56,7 +63,7 @@ def login():
 
 @app.route('/submit', methods=['POST'])
 def submit_form():
-    bluesky.login_to_bluesky()
+    #bluesky.login_to_bluesky()
     text = request.form['text']
     text_html = "<br>".join(text.splitlines())  # Convert line breaks to <br> tags
     text_html = helpers.urls_to_html_links(text_html)  # Convert URLs to links
@@ -150,8 +157,7 @@ def submit_form():
             except Exception as e:
                 logger.error('Failed to post to Twitter. Error: %s', e)
                 flash('Failed to post to Twitter. Error: {e}')
-                error_messages.append('Twitter')
-                
+                error_messages.append('Twitter')     
         if enable_instagram: 
             try:
                 #logger.debug('Image locations: %s', image_locations)
@@ -161,32 +167,8 @@ def submit_form():
                 success_messages.append('Instagram')
             except Exception as e:
                 logger.error('Failed to post to Instagram. Error: %s', e)
-                flash('Failed to post to Instagram. Error: {e}')
+                flash('Failed to post to Instagram! Error: {e}')
                 error_messages.append('Instagram')
-
-        if enable_facebook: 
-            try:
-                #logger.debug('Image locations: %s', image_locations)
-                facebook.post_to_facebook(image_locations, text_mastodon)
-                logger.debug('Posting to Facebook completed')
-                flash('Successfully posted to Facebook')
-                success_messages.append('Facebook')
-            except Exception as e:
-                logger.error('Failed to post to Instagram. Error: %s', e)
-                flash('Failed to post to Instagram. Error: {e}')
-                error_messages.append('Instagram')
-
-        if enable_posthaven:
-            try:
-                logger.debug('Sending email: %s', ', '.join(filename for filename, _ in processed_files))
-                posthaven.send_email_with_attachments(subject, text, processed_files, processed_alt_texts)
-                logger.debug('Sending email completed')
-                flash('Successfully posted to Posthaven')
-                success_messages.append('Posthaven')
-            except Exception as e:
-                logger.error('Failed to send email. Error: %s', e)
-                flash('Failed to post to Posthaven. Error: {e}')
-                error_messages.append('Posthaven')
         if enable_mastodon:
             try:
                 logger.debug('Posting to Mastodon: %s', ', '.join(filename for filename, _ in processed_files))
@@ -200,6 +182,7 @@ def submit_form():
                 error_messages.append('Mastodon')
         if enable_bluesky:
             try:
+                bluesky.login_to_bluesky()
                 logger.debug('Posting to Bluesky: %s', ', '.join(filename for filename, _ in processed_files))
                 bluesky.post_to_bluesky(text_mastodon, processed_files, processed_alt_texts)
                 logger.debug('Posting to Bluesky completed')
@@ -209,7 +192,31 @@ def submit_form():
                 logger.error('Failed to post to Bluesky. Error: %s', e)
                 error_messages.append('Bluesky')
                 flash('Failed to post to Bluesky. Error: {e}')
-
+        if enable_posthaven:
+            try:
+                logger.debug('Sending email: %s', ', '.join(filename for filename, _ in processed_files))
+                posthaven.send_email_with_attachments(subject, text, processed_files, processed_alt_texts)
+                logger.debug('Sending email completed')
+                flash('Successfully posted to Posthaven')
+                success_messages.append('Posthaven')
+            except Exception as e:
+                logger.error('Failed to send email. Error: %s', e)
+                flash('Failed to post to Posthaven. Error: {e}')
+                error_messages.append('Posthaven')
+        if enable_facebook: 
+            try:
+                #logger.debug('Image locations: %s', image_locations)
+                facebook.post_to_facebook(image_locations, text_mastodon, alt_texts)  # Include alt_texts as a parameter
+                logger.debug('Posting to Facebook completed')
+                flash('Successfully posted to Facebook')
+                success_messages.append('Facebook')
+            except Exception as e:
+                logger.error('Failed to post to Facebook. Error: %s', e)
+                flash('Failed to post to Facebook. Error: {e}')
+                error_messages.append('Facebook')
+        else:
+            logger.info('Facebook posting is not enabled')
+                
         helpers.delete_media_files_in_directory('.')
         helpers.delete_media_files_in_directory('temp')
         
