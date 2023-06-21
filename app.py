@@ -7,7 +7,6 @@ from datetime import datetime
 
 # Third-Party Libraries
 import pytz
-import logging
 from PIL import Image
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_session import Session  # if you're using flask-session
@@ -21,9 +20,6 @@ import masto
 import twitter
 import facebook
 from config import Config, MYPASSWORD
-
-# List of URLs or locations of your images
-image_locations = []
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -119,7 +115,7 @@ def submit_form():
             return redirect(url_for('index'))
 
         # Process files and store resized images
-        processed_files, processed_alt_texts = process_files(files, alt_texts)
+        processed_files, processed_alt_texts, image_locations = process_files(files, alt_texts)  # Get image_locations
         logger.debug('Files after processing: %s', ', '.join(filename for filename, _ in processed_files))
     else:
         processed_files = []
@@ -270,10 +266,11 @@ def submit_form():
 
 def process_files(files, alt_texts):
     if not files or files[0].filename == '':
-        return [], []
+        return [], [], []
 
     processed_files = []
     processed_alt_texts = []
+    image_locations = []  # Define image_locations here instead of as a global variable
     temp_dir = os.path.join(app.root_path, 'temp')
     base_url = "https://post.int0thec0de.xyz/temp/"
 
@@ -300,7 +297,7 @@ def process_files(files, alt_texts):
             flash(f"Unable to process one of the attachments. Error: {e}")
             raise
 
-    return processed_files, processed_alt_texts
+    return processed_files, processed_alt_texts, image_locations  # Return image_locations
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
