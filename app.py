@@ -239,16 +239,10 @@ def submit_form():
                 logger.error('Failed to post to Instagram. Error: %s', e)
                 flash(f'Failed to post to Instagram! Error: {e}')
                 error_messages.append('Instagram')
-
-        else:
-            logger.info('Facebook posting is not enabled')
-    except Exception as e:
-        logger.error('An unexpected error occurred: %s', e)
-
-                
+        
         helpers.delete_media_files_in_directory('.')
         helpers.delete_media_files_in_directory('temp')
-        
+    
         success_message = ''
         if success_messages:
             success_message = f'Successfully posted to: {", ".join(success_messages)}.'
@@ -263,11 +257,11 @@ def submit_form():
             flash(success_message)
         elif error_message:
             flash(error_message)
-    #except Exception as e:
-    #    error_message = f'Failed to execute functions. Error: {e}'
-    #    line_number = inspect.currentframe().f_lineno
-    #    logger.error(f'{error_message} (Line: {line_number})')
-    #    flash(error_message)
+    except Exception as e:
+        error_message = f'Failed to execute functions. Error: {e}'
+        line_number = inspect.currentframe().f_lineno
+        logger.error(f'{error_message} (Line: {line_number})')
+        flash(error_message)
 
     end_time = time.time();
     speed_logger.info(f"OVERALL execution time: {end_time-start_time} seconds")
