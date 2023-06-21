@@ -1,13 +1,18 @@
+# Python Standard Library
 import os
+import time
+import inspect
+import urllib.parse
+from datetime import datetime
+
+# Third-Party Libraries
 import pytz
 import logging
 from PIL import Image
-from datetime import datetime
-import inspect
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_session import Session  # if you're using flask-session
 
-# Custom modules
+# Your Applications/Library specific modules
 import helpers
 import posthaven
 import bluesky
@@ -17,23 +22,15 @@ import twitter
 import facebook
 from config import Config, MYPASSWORD
 
-# Get the filename of the current module
-logname = os.path.splitext(os.path.basename(__file__))[0]
-
-# Set up root logger
-logging.basicConfig(filename='app.log', 
-                    format='%(asctime)s %(levelname)s %(name)s %(message)s', 
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    level=logging.DEBUG)
-
-# Now you can get that logger with logging.getLogger() without arguments
-logger = logging.getLogger()
-
 # List of URLs or locations of your images
 image_locations = []
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Setup logging
+logger, speed_logger = helpers.configure_logging()
+
 Session(app)
 
 @app.errorhandler(502)
@@ -63,7 +60,11 @@ def login():
 
 @app.route('/submit', methods=['POST'])
 def submit_form():
-    #bluesky.login_to_bluesky()
+    start_time = time.time()
+
+    if start_time is None:
+        start_time = time.time()
+   
     text = request.form['text']
     text_html = "<br>".join(text.splitlines())  # Convert line breaks to <br> tags
     text_html = helpers.urls_to_html_links(text_html)  # Convert URLs to links
@@ -107,7 +108,7 @@ def submit_form():
 
         # Sort the list of tuples by the new file names
         file_alt_text_pairs.sort(key=lambda pair: pair[0].filename)
-        logger.info('sorted file pairs: %s', file_alt_text_pairs)
+        logger.info('sorted file pairs: %s', [pair[0].filename for pair in file_alt_text_pairs])
 
         # Unzip the list of tuples back into files and alt_texts using list comprehensions
         files, alt_texts = [list(t) for t in zip(*file_alt_text_pairs)]
@@ -147,75 +148,103 @@ def submit_form():
     try:
         success_messages = []
         error_messages = []
+        start = None
+        end = None
+        
         if enable_twitter:
+            start = time.time()
             try:
                 if textOnly: processed_files = []
                 twitter.upload_to_twitter(processed_files, processed_alt_texts, text_mastodon)
+                end = time.time()
+                speed_logger.info(f"Twitter upload execution time: {end - start} seconds")
                 logger.debug('Posting to Twitter completed')
                 flash('Successfully posted to Twitter')
                 success_messages.append('Twitter')
             except Exception as e:
                 logger.error('Failed to post to Twitter. Error: %s', e)
-                flash('Failed to post to Twitter. Error: {e}')
-                error_messages.append('Twitter')     
-        if enable_instagram: 
-            try:
-                #logger.debug('Image locations: %s', image_locations)
-                instagram.postInstagramCarousel(image_locations, text)
-                logger.debug('Posting to Instagram completed')
-                flash('Successfully posted to Instagram')
-                success_messages.append('Instagram')
-            except Exception as e:
-                logger.error('Failed to post to Instagram. Error: %s', e)
-                flash('Failed to post to Instagram! Error: {e}')
-                error_messages.append('Instagram')
+                flash(f'Failed to post to Twitter. Error: {e}')
+                error_messages.append('Twitter')
+        
         if enable_mastodon:
+            start = time.time()
             try:
                 logger.debug('Posting to Mastodon: %s', ', '.join(filename for filename, _ in processed_files))
                 masto.post_to_mastodon(subject, text_mastodon, processed_files, processed_alt_texts)
+                end = time.time()
+                speed_logger.info(f"Mastodon post execution time: {end - start} seconds")
                 logger.debug('Posting to Mastodon completed')
                 flash('Successfully posted to Mastodon')
                 success_messages.append('Mastodon')
             except Exception as e:
                 logger.error('Failed to post to Mastodon. Error: %s', e)
-                flash('Failed to post to Mastodon. Error: {e}')
+                flash(f'Failed to post to Mastodon. Error: {e}')
                 error_messages.append('Mastodon')
+        
         if enable_bluesky:
+            start = time.time()
             try:
                 bluesky.login_to_bluesky()
                 logger.debug('Posting to Bluesky: %s', ', '.join(filename for filename, _ in processed_files))
                 bluesky.post_to_bluesky(text_mastodon, processed_files, processed_alt_texts)
+                end = time.time()
+                speed_logger.info(f"Bluesky post execution time: {end - start} seconds")
                 logger.debug('Posting to Bluesky completed')
                 flash('Successfully posted to Bluesky')
                 success_messages.append('Bluesky')
             except Exception as e:
                 logger.error('Failed to post to Bluesky. Error: %s', e)
                 error_messages.append('Bluesky')
-                flash('Failed to post to Bluesky. Error: {e}')
+                flash(f'Failed to post to Bluesky. Error: {e}')
+        
         if enable_posthaven:
+            start = time.time()
             try:
                 logger.debug('Sending email: %s', ', '.join(filename for filename, _ in processed_files))
                 posthaven.send_email_with_attachments(subject, text, processed_files, processed_alt_texts)
+                end = time.time()
+                speed_logger.info(f"Posthaven email execution time: {end - start} seconds")
                 logger.debug('Sending email completed')
                 flash('Successfully posted to Posthaven')
                 success_messages.append('Posthaven')
             except Exception as e:
                 logger.error('Failed to send email. Error: %s', e)
-                flash('Failed to post to Posthaven. Error: {e}')
+                flash(f'Failed to post to Posthaven. Error: {e}')
                 error_messages.append('Posthaven')
-        if enable_facebook: 
+        
+        if enable_facebook:
+            start = time.time()
             try:
-                #logger.debug('Image locations: %s', image_locations)
                 facebook.post_to_facebook(image_locations, text_mastodon, alt_texts)  # Include alt_texts as a parameter
+                end = time.time()
+                speed_logger.info(f"Facebook post execution time: {end - start} seconds")
                 logger.debug('Posting to Facebook completed')
                 flash('Successfully posted to Facebook')
                 success_messages.append('Facebook')
             except Exception as e:
                 logger.error('Failed to post to Facebook. Error: %s', e)
-                flash('Failed to post to Facebook. Error: {e}')
+                flash(f'Failed to post to Facebook. Error: {e}')
                 error_messages.append('Facebook')
+
+        if enable_instagram:
+            start = time.time()
+            try:
+                instagram.postInstagramCarousel(image_locations, text)
+                end = time.time()
+                speed_logger.info(f"Instagram post execution time: {end - start} seconds")
+                logger.debug('Posting to Instagram completed')
+                flash('Successfully posted to Instagram')
+                success_messages.append('Instagram')
+            except Exception as e:
+                logger.error('Failed to post to Instagram. Error: %s', e)
+                flash(f'Failed to post to Instagram! Error: {e}')
+                error_messages.append('Instagram')
+
         else:
             logger.info('Facebook posting is not enabled')
+    except Exception as e:
+        logger.error('An unexpected error occurred: %s', e)
+
                 
         helpers.delete_media_files_in_directory('.')
         helpers.delete_media_files_in_directory('temp')
@@ -234,11 +263,14 @@ def submit_form():
             flash(success_message)
         elif error_message:
             flash(error_message)
-    except Exception as e:
-        error_message = f'Failed to execute functions. Error: {e}'
-        line_number = inspect.currentframe().f_lineno
-        logger.error(f'{error_message} (Line: {line_number})')
-        flash(error_message)
+    #except Exception as e:
+    #    error_message = f'Failed to execute functions. Error: {e}'
+    #    line_number = inspect.currentframe().f_lineno
+    #    logger.error(f'{error_message} (Line: {line_number})')
+    #    flash(error_message)
+
+    end_time = time.time();
+    speed_logger.info(f"OVERALL execution time: {end_time-start_time} seconds")
 
     return redirect(url_for('index'))
 
@@ -254,7 +286,7 @@ def process_files(files, alt_texts):
     for (file, alt_text) in zip(files, alt_texts):
         try:
             image = Image.open(file).convert("RGB")
-            filename = os.path.splitext(file.filename)[0] + '.jpg'
+            filename = urllib.parse.quote(os.path.splitext(file.filename)[0]) + '.jpg'
             temp_file_path = os.path.join(temp_dir, filename)
 
             image.save(temp_file_path, 'JPEG', quality=90)

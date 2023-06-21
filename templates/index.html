@@ -10,36 +10,37 @@
 </head>
 <body>
     <div class="container">
-        <form action="/submit" method="POST" enctype="multipart/form-data" onsubmit="disableSubmitButton()">
+        <form action="/submit" method="POST" enctype="multipart/form-data" onsubmit="validateCheckboxes(event)">
             <h2>My Own Little Cross-Poster (v.{{ version }})</h2>
             <textarea id="text" name="text" required oninput="updateCharacterCount()"></textarea><br>
             <p>Character count: <span id="characterCount">0</span></p>
+
+            <input type="file" id="files" name="files" multiple accept="image/*" onchange="handleFiles(this.files)"><br>
+            <div id="fileList"></div>
 
             <input type="checkbox" id="hashtagCheckbox" name="hashtagCheckbox" checked onclick="updateCharacterCount()">
             <label for="hashtagCheckbox">add hashtags?</label><br><br>
             <input type="text" id="txt_hashtags" name="txt_hashtags" value="#midjourney #aiart #aiartcommunity" oninput="updateCharacterCount()">         
 
-            <input type="checkbox" id="chkBS" name="chkBS" checked>
+            <input type="checkbox" id="chkBS" name="chkBS" checked onclick="hideErrorMessage();">
             <label for="chkBS">enable Bluesky</label><br><br>
 
-            <input type="checkbox" id="chkMS" name="chkMS" checked>
+            <input type="checkbox" id="chkMS" name="chkMS" checked onclick="hideErrorMessage();">
             <label for="chkMS">enable Mastodon</label><br><br>
 
-            <input type="checkbox" id="chkPH" name="chkPH" checked>
+            <input type="checkbox" id="chkPH" name="chkPH" checked onclick="hideErrorMessage();">
             <label for="chkPH">enable Posthaven</label><br><br>
 
-            <input type="checkbox" id="chkIG" name="chkIG" checked>
+            <input type="checkbox" id="chkIG" name="chkIG" checked onclick="hideErrorMessage();">
             <label for="chkIG">enable Instagram</label><br><br>
 
-            <input type="checkbox" id="chkTW" name="chkTW" checked>
+            <input type="checkbox" id="chkTW" name="chkTW" checked onclick="hideErrorMessage();">
             <label for="chkTW">enable Twitter</label><br><br>
 
-            <input type="checkbox" id="chkFB" name="chkFB" checked>
+            <input type="checkbox" id="chkFB" name="chkFB" checked onclick="hideErrorMessage();">
             <label for="chkFB">enable Facebook</label><br><br>
 
-            <input type="file" id="files" name="files" multiple accept="image/*" onchange="handleFiles(this.files)"><br>
-            <div id="fileList"></div>
-            
+            <div id="errorMessage" style="display: none; color: red; margin-bottom: 10px;"></div>
             <input type="submit" id="submitButton" value="Submit">
         </form>
     </div>

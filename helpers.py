@@ -70,3 +70,33 @@ def urls_to_html_links(text_html):
         text_html = text_html[:start] + url_format.format(url, url) + text_html[end:]
 
     return text_html
+
+def configure_logging():
+    # Set up root logger
+    logging.basicConfig(filename='app.log', 
+                        format='%(asctime)s %(levelname)s %(name)s %(message)s', 
+                        datefmt='%Y-%m-%d %H:%M:%S',
+                        level=logging.DEBUG)
+
+    logging.getLogger("requests_oauthlib").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+    # This is your general logger
+    logger = logging.getLogger()
+
+    # Set up logging for speed measurements
+    speed_logger = logging.getLogger('speed_logger')
+    speed_logger.setLevel(logging.INFO)
+
+    handler = logging.FileHandler('speed.log')
+    handler.setLevel(logging.INFO)
+
+    formatter = logging.Formatter('%(asctime)s - %(message)s')
+    handler.setFormatter(formatter)
+
+    speed_logger.addHandler(handler)
+
+    # Return both loggers
+    return logger, speed_logger
+

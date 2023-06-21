@@ -17,15 +17,23 @@ window.onload = function() {
 
             var input = document.createElement('input');
             input.type = 'text';
-            input.size = 20
             input.name = 'new_name_' + i; // New filename input field
             input.placeholder = 'New filename for ' + files[i].name; // Placeholder text
+            input.style.width = '25%';  // Set width to 50% of the parent width
             div.appendChild(input);
+            
 
-            var altInput = document.createElement('input');
-            altInput.type = 'text';
+            var altInput = document.createElement('textarea');
             altInput.name = 'alt_text_' + i;
-            altInput.placeholder = 'Alt text for ' + files[i].name;
+            //altInput.placeholder = 'Alt text for ' + files[i].name;
+            altInput.placeholder = 'enter alt text here' 
+            altInput.style.resize = "none";
+            altInput.style.overflow = "hidden";
+            altInput.style.width = "100%";
+            altInput.onkeyup = function() {
+                this.style.height = "auto";
+                this.style.height = (this.scrollHeight) + "px";
+            };
             div.appendChild(altInput);
 
             fileList.appendChild(div);
@@ -58,4 +66,25 @@ function updateCharacterCount() {
     }
     var counter = document.getElementById('characterCount');
     counter.textContent = characterCount;
+}
+
+function validateCheckboxes(event) {
+    let checkboxes = document.querySelectorAll("input[type='checkbox']:not(#hashtagCheckbox)");
+    let isChecked = Array.from(checkboxes).some(checkbox => checkbox.checked);
+    let errorMessage = document.getElementById("errorMessage");
+
+    if (!isChecked) {
+        errorMessage.style.display = "block";
+        errorMessage.innerText = 'You need to select at least one site';
+        event.preventDefault();  // stop form submission
+    } else {
+        errorMessage.style.display = "none";
+        disableSubmitButton();  // Button is disabled only if the validation has passed
+    }
+}
+
+
+function hideErrorMessage() {
+    let errorMessage = document.getElementById("errorMessage");
+    errorMessage.style.display = "none";
 }
