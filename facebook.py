@@ -3,6 +3,7 @@ import json
 import logging
 from typing import List, Optional
 from config import (FB_ACCESS_TOKEN, FB_PAGE_ID)
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger()
 
@@ -10,22 +11,25 @@ logger = logging.getLogger()
 IMAGE_URL = f'https://graph.facebook.com/{FB_PAGE_ID}/photos'
 FEED_URL = f"https://graph.facebook.com/{FB_PAGE_ID}/feed"
 
+def upload_image_to_fb(image_location: str) -> Optional[str]:
+    payload = {
+        'url': image_location,
+        'access_token': FB_ACCESS_TOKEN,
+        'published': 'false'
+    }
+    r = requests.post(IMAGE_URL, data=payload)
+    if r.status_code != 200:
+        logger.error(f"Failed to upload image: {image_location}. Error: {r.text}")
+        return None
+    photo_id = r.json()['id']
+    logger.info(f"Image uploaded successfully: {image_location}")
+    logger.debug(f"uploaded photo id: {photo_id}")
+    return photo_id
+
 def upload_images_to_fb(image_locations: List[str]) -> List[str]:
-    uploaded_photo_ids = []
-    for image_location in image_locations:
-        payload = {
-            'url': image_location,
-            'access_token': FB_ACCESS_TOKEN,
-            'published': 'false'
-        }
-        r = requests.post(IMAGE_URL, data=payload)
-        if r.status_code != 200:
-            logger.error(f"Failed to upload image: {image_location}. Error: {r.text}")
-            continue
-        photo_id = r.json()['id']
-        uploaded_photo_ids.append(photo_id)
-        logger.info(f"Image uploaded successfully: {image_location}")
-        logger.debug(f"uploaded photo id: {photo_id}")
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(upload_image_to_fb, image_location) for image_location in image_locations}
+        uploaded_photo_ids = [future.result() for future in futures if future.result() is not None]
     return uploaded_photo_ids
 
 def post_to_facebook(image_locations: List[str], text: str, alt_texts: Optional[List[str]] = None) -> bool:

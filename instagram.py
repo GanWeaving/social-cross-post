@@ -3,6 +3,7 @@ import requests
 import json
 import helpers
 from config import (INSTAGRAM_USER_ID, USER_ACCESS_TOKEN)
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger()
 
@@ -71,7 +72,12 @@ def postInstagramCarousel(image_locations, text):
         postInstagramSingleImage(image_locations[0], text)
         return
 
-    children = [create_item_container(image_url) for image_url in image_locations if create_item_container(image_url) is not None]
+    # Create a ThreadPoolExecutor
+    with ThreadPoolExecutor() as executor:
+        # Submit tasks to the executor
+        futures = {executor.submit(create_item_container, image_url) for image_url in image_locations}
+        # Gather the results as they become available
+        children = [future.result() for future in futures if future.result() is not None]
 
     if children:
         carousel_id = create_carousel_container(children, text)
