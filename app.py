@@ -4,7 +4,7 @@ import time
 import inspect
 import urllib.parse
 from datetime import datetime
-import uuid
+import shutil
 
 # Third-Party Libraries
 import pytz
@@ -291,7 +291,6 @@ def send_scheduled_post(post_id):
         else:
             logger.debug(f"Post {post.id} is not yet due to be posted.")
 
-
 def save_post_to_database(post_data):
     scheduled_time = post_data.get('scheduled_time')
 
@@ -312,6 +311,7 @@ def save_post_to_database(post_data):
             db.session.add(post)
             db.session.commit()
             logger.info('Post saved to the database.')
+            flash('Post has been scheduled!')
         except Exception as e:
             db.session.rollback()
             logger.exception('Error occurred while saving post to the database: %s', e)
@@ -320,7 +320,6 @@ def save_post_to_database(post_data):
         return post
     else:
         logger.info('Scheduled time is not provided. Posting immediately.')
-
 
 def send_post(post_data):
 
@@ -337,7 +336,7 @@ def send_post(post_data):
             start = time.time()
             try:
                 if post_data['textOnly']: post_data['processed_files'] = []
-                twitter.upload_to_twitter(post_data['processed_files'], post_data['processed_alt_texts'], post_data['text_mastodon'])
+                twitter.upload_to_twitter(post_data['image_locations'], post_data['processed_alt_texts'], post_data['text_mastodon'])
                 end = time.time()
                 speed_logger.info(f"Twitter upload execution time: {end - start} seconds")
                 logger.debug('Posting to Twitter completed')
@@ -367,8 +366,8 @@ def send_post(post_data):
             start = time.time()
             try:
                 bluesky.login_to_bluesky()
-                logger.debug('Posting to Bluesky: %s', ', '.join(filename for filename, _ in post_data['processed_files']))
-                bluesky.post_to_bluesky(post_data['text_mastodon'], post_data['processed_files'], post_data['processed_alt_texts'])
+                logger.debug('Posting to Bluesky: %s images', len(post_data['image_locations']))
+                bluesky.post_to_bluesky(post_data['text_mastodon'], post_data['image_locations'], post_data['processed_alt_texts'])
                 end = time.time()
                 speed_logger.info(f"Bluesky post execution time: {end - start} seconds")
                 logger.debug('Posting to Bluesky completed')
@@ -426,6 +425,7 @@ def send_post(post_data):
         try:
             #helpers.delete_media_files_in_directory('.')
             helpers.delete_media_files_in_directory('static/temp')
+            #delete_directory(directory)
         except Exception as e:
             error_message = f'Failed to delete media files. Error: {e}'
             line_number = inspect.currentframe().f_lineno
@@ -462,6 +462,13 @@ def send_post(post_data):
         logger.error(f'{error_message} (Line: {line_number})')
         if post_data.get('scheduled_time'):
             flash(error_message)
+
+def delete_directory(directory):
+    try:
+        shutil.rmtree(directory)
+        logger.debug(f"Deleted directory: {directory}")
+    except Exception as e:
+        logger.error(f"Failed to delete directory {directory}. Error: {e}")
 
 def process_files(files, alt_texts, scheduled_time):
     if not files or files[0].filename == '':

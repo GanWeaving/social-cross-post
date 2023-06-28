@@ -1,9 +1,9 @@
 import helpers
 import logging
-import os
 from atproto import Client, models
 from datetime import datetime
 from config import (BLUESKY_EMAIL, BLUESKY_PASSWORD)
+from urllib.parse import urlparse
 
 logger = logging.getLogger()
 
@@ -17,7 +17,7 @@ def login_to_bluesky():
     except Exception as e:
         logger.error(f"Failed to log in to Bluesky: {e}")
 
-import os
+from urllib.parse import urlparse
 
 def post_to_bluesky(text, image_locations, alt_texts):
     login_to_bluesky()
@@ -26,17 +26,25 @@ def post_to_bluesky(text, image_locations, alt_texts):
     
     images = []
     for idx, image_location in enumerate(image_locations):
-        # Extract local file path from tuple
-        local_file_path = image_location[0]
-        alt_text = alt_texts[idx] if idx < len(alt_texts) else ""
-        
-        # Open file in binary mode
-        with open(local_file_path, 'rb') as img_file:
-            img_data = img_file.read()
-            
-        upload = client.com.atproto.repo.upload_blob(img_data)
-        images.append(models.AppBskyEmbedImages.Image(alt=alt_text, image=upload.blob))
-        logger.debug(f"Uploaded image: {upload.blob}")
+        try:
+            # Parse the URL and get the path
+            url_parts = urlparse(image_location)
+            local_file_path = url_parts.path[1:]  # Remove the leading '/'
+
+            # Debug: log the current file path
+            logger.debug(f"Processing image file: {local_file_path}")
+
+            # Open the image file from its location
+            with open(local_file_path, 'rb') as img_file:
+                img_data = img_file.read()
+
+            upload = client.com.atproto.repo.upload_blob(img_data)
+            images.append(models.AppBskyEmbedImages.Image(alt=alt_texts[idx], image=upload.blob))
+            logger.debug(f"Uploaded image: {upload.blob}")
+        except Exception as e:
+            # Exception handling: log the error and local file path
+            logger.exception(f"Unable to process the image file at {local_file_path} for Bluesky. Error: {e}")
+            raise
 
     embed = models.AppBskyEmbedImages.Main(images=images) if images else None
     facets = helpers.generate_facets_from_links_in_text(text) if helpers.URL_PATTERN.search(text) else None
@@ -52,3 +60,4 @@ def post_to_bluesky(text, image_locations, alt_texts):
         )
     )
     logger.debug("Bluesky post created.")
+

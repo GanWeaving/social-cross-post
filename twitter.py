@@ -4,6 +4,7 @@ import requests
 import logging
 import helpers
 from requests_oauthlib import OAuth1
+from urllib.parse import urlparse
 
 logger = logging.getLogger()
 
@@ -28,13 +29,14 @@ client = Client(
 )
 
 def upload_to_twitter(image_locations, alt_texts, text):
-    if image_locations:  
+    if image_locations:
         media_ids = []
         for image_location, alt_text in zip(image_locations, alt_texts):
-            # Extract local file path from tuple
-            local_file_path = image_location[0]
-            
-            # get media id
+            # Parse the URL and get the path
+            url_parts = urlparse(image_location)
+            local_file_path = url_parts.path[1:]  # Remove the leading '/'
+
+            # Get media id
             media_id = upload_local_image(local_file_path, twitter_config, alt_text)
             media_ids.append(media_id)
         
