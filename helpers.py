@@ -58,7 +58,12 @@ def delete_media_files_in_directory(directory):
     file_types = ['*.jpg', '*.png', '*.jpeg', '*.gif']
     for file_type in file_types:
         for file in glob.glob(os.path.join(directory, file_type)):
-            os.remove(file)
+            try:
+                os.remove(file)
+                logger.debug(f"Deleted file: {file}")
+            except Exception as e:
+                logger.error(f"Failed to delete file {file}. Error: {e}")
+
 
 def urls_to_html_links(text_html):
     url_format = '<a href="{}">{}</a>'

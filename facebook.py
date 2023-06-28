@@ -1,6 +1,7 @@
 import requests
 import json
 import logging
+import uuid
 from typing import List, Optional
 from config import (FB_ACCESS_TOKEN, FB_PAGE_ID)
 from concurrent.futures import ThreadPoolExecutor
@@ -17,13 +18,16 @@ def upload_image_to_fb(image_location: str) -> Optional[str]:
         'access_token': FB_ACCESS_TOKEN,
         'published': 'false'
     }
+    # Generate a unique id for this operation
+    operation_id = uuid.uuid4()
+    logger.debug(f"{operation_id} - Initiating upload for image: {image_location}")
     r = requests.post(IMAGE_URL, data=payload)
     if r.status_code != 200:
-        logger.error(f"Failed to upload image: {image_location}. Error: {r.text}")
+        logger.error(f"{operation_id} - Failed to upload image: {image_location}. Error: {r.text}")
         return None
     photo_id = r.json()['id']
-    logger.info(f"Image uploaded successfully: {image_location}")
-    logger.debug(f"uploaded photo id: {photo_id}")
+    logger.info(f"{operation_id} - Image uploaded successfully: {image_location}")
+    logger.debug(f"{operation_id} - uploaded photo id: {photo_id}")
     return photo_id
 
 def upload_images_to_fb(image_locations: List[str]) -> List[str]:

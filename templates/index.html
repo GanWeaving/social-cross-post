@@ -21,24 +21,40 @@
             <input type="checkbox" id="hashtagCheckbox" name="hashtagCheckbox" checked onclick="updateCharacterCount()">
             <label for="hashtagCheckbox">add hashtags?</label><br><br>
             <input type="text" id="txt_hashtags" name="txt_hashtags" value="#midjourney #aiart #aiartcommunity" oninput="updateCharacterCount()">         
+            
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                <div>
+                    <input type="checkbox" id="chkBS" name="chkBS" checked onclick="hideErrorMessage();">
+                    <label for="chkBS">Bluesky</label>
+                </div>
 
-            <input type="checkbox" id="chkBS" name="chkBS" checked onclick="hideErrorMessage();">
-            <label for="chkBS">enable Bluesky</label><br><br>
+                <div>
+                    <input type="checkbox" id="chkMS" name="chkMS" checked onclick="hideErrorMessage();">
+                    <label for="chkMS">Mastodon</label>
+                </div>
 
-            <input type="checkbox" id="chkMS" name="chkMS" checked onclick="hideErrorMessage();">
-            <label for="chkMS">enable Mastodon</label><br><br>
+                <div>
+                    <input type="checkbox" id="chkPH" name="chkPH" checked onclick="hideErrorMessage();">
+                    <label for="chkPH">Posthaven</label>
+                </div>
 
-            <input type="checkbox" id="chkPH" name="chkPH" checked onclick="hideErrorMessage();">
-            <label for="chkPH">enable Posthaven</label><br><br>
+                <div>
+                    <input type="checkbox" id="chkIG" name="chkIG" checked onclick="hideErrorMessage();">
+                    <label for="chkIG">Instagram</label>
+                </div>
 
-            <input type="checkbox" id="chkIG" name="chkIG" checked onclick="hideErrorMessage();">
-            <label for="chkIG">enable Instagram</label><br><br>
+                <div>
+                    <input type="checkbox" id="chkTW" name="chkTW" checked onclick="hideErrorMessage();">
+                    <label for="chkTW">Twitter</label>
+                </div>
 
-            <input type="checkbox" id="chkTW" name="chkTW" checked onclick="hideErrorMessage();">
-            <label for="chkTW">enable Twitter</label><br><br>
+                <div>
+                    <input type="checkbox" id="chkFB" name="chkFB" checked onclick="hideErrorMessage();">
+                    <label for="chkFB">Facebook</label>
+                </div>
+            </div>
 
-            <input type="checkbox" id="chkFB" name="chkFB" checked onclick="hideErrorMessage();">
-            <label for="chkFB">enable Facebook</label><br><br>
+            <input type="datetime-local" id="scheduleTime" name="scheduled_time" style="margin-bottom: 20px;"><br>
 
             <div id="errorMessage" style="display: none; color: red; margin-bottom: 10px;"></div>
             <input type="submit" id="submitButton" value="Submit">
