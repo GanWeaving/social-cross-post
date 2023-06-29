@@ -66,7 +66,17 @@ function updateCharacterCount() {
     }
     var counter = document.getElementById('characterCount');
     counter.textContent = characterCount;
+
+    // Check if the character count exceeds the limit
+    if (characterCount > 240) {
+        // Display a warning
+        document.getElementById('warningMessage').style.display = 'block';
+    } else {
+        // Hide the warning
+        document.getElementById('warningMessage').style.display = 'none';
+    }
 }
+
 
 function validateCheckboxes(event) {
     let checkboxes = document.querySelectorAll("input[type='checkbox']:not(#hashtagCheckbox)");

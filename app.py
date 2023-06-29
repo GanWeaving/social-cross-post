@@ -4,7 +4,6 @@ import time
 import inspect
 import urllib.parse
 from datetime import datetime
-import shutil
 
 # Third-Party Libraries
 import pytz
@@ -164,7 +163,7 @@ def submit_form():
             return redirect(url_for('index'))
 
         # Process files and store resized images
-        processed_files, processed_alt_texts, image_locations = process_files(files, alt_texts, scheduled_time)  # Get image_locations
+        processed_files, processed_alt_texts, image_locations = process_files(files, alt_texts, scheduled_time) # Get image_locations
         logger.debug('Files after processing: %s', ', '.join(filename for filename, _ in processed_files))
     else:
         processed_files = []
@@ -237,7 +236,7 @@ def submit_form():
         logger.debug('Your post has been scheduled.')
     else:
         # Post immediately
-        send_post(post_data)
+        helpers.send_post(post_data)
 
     end_time = time.time()
     speed_logger.info(f"OVERALL execution time: {end_time-start_time} seconds")
@@ -262,7 +261,7 @@ def send_scheduled_post(post_id):
 
             logger.debug(f"Attempting to send Post {post.id}")
             try:
-                send_post(post_data)
+                helpers.send_post(post_data)
                 logger.debug(f"Post {post.id} has been successfully sent.")
             except Exception as e:
                 logger.error(f"Error occurred while sending Post {post.id}: {str(e)}")
@@ -282,8 +281,8 @@ def send_scheduled_post(post_id):
 
             try:
                 scheduled_folder = scheduled_time.strftime("%Y%m%d_%H%M%S")
-                temp_dir = os.path.join(app.root_path, 'static/temp', scheduled_folder)
-                helpers.delete_media_files_in_directory(temp_dir)
+                #temp_dir = os.path.join(app.root_path, 'static/temp', scheduled_folder)
+                #helpers.delete_media_files_in_directory(temp_dir)
             except Exception as e:
                 error_message = f'Failed to delete media files. Error: {e}'
                 line_number = inspect.currentframe().f_lineno
@@ -315,160 +314,12 @@ def save_post_to_database(post_data):
         except Exception as e:
             db.session.rollback()
             logger.exception('Error occurred while saving post to the database: %s', e)
+            flash(f'Scheduling has failed! error: {e}')
             return None
 
         return post
     else:
         logger.info('Scheduled time is not provided. Posting immediately.')
-
-def send_post(post_data):
-
-    # Add success_messages and error_messages to post_data
-    post_data['success_messages'] = []
-    post_data['error_messages'] = []
-
-    try:
-
-        start = None
-        end = None
-        
-        if post_data['enable_twitter']:
-            start = time.time()
-            try:
-                if post_data['textOnly']: post_data['processed_files'] = []
-                twitter.upload_to_twitter(post_data['image_locations'], post_data['processed_alt_texts'], post_data['text_mastodon'])
-                end = time.time()
-                speed_logger.info(f"Twitter upload execution time: {end - start} seconds")
-                logger.debug('Posting to Twitter completed')
-                #flash('Successfully posted to Twitter')
-                post_data['success_messages'].append('Twitter')
-            except Exception as e:
-                logger.error('Failed to post to Twitter. Error: %s', e)
-                #flash(f'Failed to post to Twitter. Error: {e}')
-                post_data['error_messages'].append('Twitter')
-
-        if post_data['enable_mastodon']:
-            start = time.time()
-            try:
-                logger.debug('Posting to Mastodon: %s', ', '.join(post_data['image_locations']))
-                masto.post_to_mastodon(post_data['subject'], post_data['text_mastodon'], post_data['image_locations'], post_data['processed_alt_texts'])
-                end = time.time()
-                speed_logger.info(f"Mastodon post execution time: {end - start} seconds")
-                logger.debug('Posting to Mastodon completed')
-                #flash('Successfully posted to Mastodon')
-                post_data['success_messages'].append('Mastodon')
-            except Exception as e:
-                logger.error('Failed to post to Mastodon. Error: %s', e)
-                #flash(f'Failed to post to Mastodon. Error: {e}')
-                post_data['error_messages'].append('Mastodon')
-
-        if post_data['enable_bluesky']:
-            start = time.time()
-            try:
-                bluesky.login_to_bluesky()
-                logger.debug('Posting to Bluesky: %s images', len(post_data['image_locations']))
-                bluesky.post_to_bluesky(post_data['text_mastodon'], post_data['image_locations'], post_data['processed_alt_texts'])
-                end = time.time()
-                speed_logger.info(f"Bluesky post execution time: {end - start} seconds")
-                logger.debug('Posting to Bluesky completed')
-                #flash('Successfully posted to Bluesky')
-                post_data['success_messages'].append('Bluesky')
-            except Exception as e:
-                logger.error('Failed to post to Bluesky. Error: %s', e)
-                post_data['error_messages'].append('Bluesky')
-                #flash(f'Failed to post to Bluesky. Error: {e}')
-
-        if post_data['enable_posthaven']:
-            start = time.time()
-            try:
-                logger.debug('Sending email: %s', ', '.join(image_location for image_location in post_data['image_locations']))
-                posthaven.send_email_with_attachments(post_data['subject'], post_data['text'], post_data['image_locations'], post_data['processed_alt_texts'])
-                end = time.time()
-                speed_logger.info(f"Posthaven email execution time: {end - start} seconds")
-                logger.debug('Sending email completed')
-                #flash('Successfully posted to Posthaven')
-                post_data['success_messages'].append('Posthaven')
-            except Exception as e:
-                logger.error('Failed to send email. Error: %s', e)
-                #flash(f'Failed to post to Posthaven. Error: {e}')
-                post_data['error_messages'].append('Posthaven')
-
-        if post_data['enable_facebook']:
-            start = time.time()
-            try:
-                facebook.post_to_facebook(post_data['image_locations'], post_data['text_mastodon'], post_data['processed_alt_texts'])  # Include alt_texts as a parameter
-                end = time.time()
-                speed_logger.info(f"Facebook post execution time: {end - start} seconds")
-                logger.debug('Posting to Facebook completed')
-                #flash('Successfully posted to Facebook')
-                post_data['success_messages'].append('Facebook')
-            except Exception as e:
-                logger.error('Failed to post to Facebook. Error: %s', e)
-                #flash(f'Failed to post to Facebook. Error: {e}')
-                post_data['error_messages'].append('Facebook')
-
-        if post_data['enable_instagram']:
-            start = time.time()
-            try:
-                instagram.postInstagramCarousel(post_data['image_locations'], post_data['text'])
-                end = time.time()
-                speed_logger.info(f"Instagram post execution time: {end - start} seconds")
-                logger.debug('Posting to Instagram completed')
-                #flash('Successfully posted to Instagram')
-                post_data['success_messages'].append('Instagram')
-            except Exception as e:
-                logger.error('Failed to post to Instagram. Error: %s', e)
-                #flash(f'Failed to post to Instagram! Error: {e}')
-                post_data['error_messages'].append('Instagram')
-
-        
-        try:
-            #helpers.delete_media_files_in_directory('.')
-            helpers.delete_media_files_in_directory('static/temp')
-            #delete_directory(directory)
-        except Exception as e:
-            error_message = f'Failed to delete media files. Error: {e}'
-            line_number = inspect.currentframe().f_lineno
-            logger.error(f'{error_message} (Line: {line_number})')
-            #flash(error_message)
-    
-        # Refer to post_data dictionary to form success and error messages
-        success_message = ''
-        if post_data['success_messages']:
-            success_message = f'Successfully posted to: {", ".join(post_data["success_messages"])}.'
-
-        error_message = ''
-        if post_data['error_messages']:
-            error_message = f'Failed to post to: {", ".join(post_data["error_messages"])}.'
-
-        if post_data.get('scheduled_time'):
-            if success_message and error_message:
-                logger.debug(f'{success_message} {error_message}')
-            elif success_message:
-                logger.debug(success_message)
-            elif error_message:
-                logger.debug(error_message)
-        else:
-            if success_message and error_message:
-                flash(f'{success_message} {error_message}')
-            elif success_message:
-                flash(success_message)
-            elif error_message:
-                flash(error_message)
-
-    except Exception as e:
-        error_message = f'Failed to execute functions. Error: {e}'
-        line_number = inspect.currentframe().f_lineno
-        logger.error(f'{error_message} (Line: {line_number})')
-        if post_data.get('scheduled_time'):
-            flash(error_message)
-
-def delete_directory(directory):
-    try:
-        shutil.rmtree(directory)
-        logger.debug(f"Deleted directory: {directory}")
-    except Exception as e:
-        logger.error(f"Failed to delete directory {directory}. Error: {e}")
 
 def process_files(files, alt_texts, scheduled_time):
     if not files or files[0].filename == '':
@@ -481,26 +332,27 @@ def process_files(files, alt_texts, scheduled_time):
 
     if scheduled_time:
         # Create a subfolder based on the scheduled time
-        scheduled_folder = scheduled_time.strftime("%Y%m%d_%H%M%S")
-        temp_dir = os.path.join(temp_dir, scheduled_folder)
-        os.makedirs(temp_dir, exist_ok=True)
+        folder_name = scheduled_time.strftime("%Y%m%d_%H%M%S")
+    else:
+        # If it's not scheduled_time, use the current time as the folder name
+        folder_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    temp_dir = os.path.join(temp_dir, folder_name)
+    os.makedirs(temp_dir, exist_ok=True)
 
     for (file, alt_text) in zip(files, alt_texts):
         try:
             image = Image.open(file).convert("RGB")
             filename = urllib.parse.quote(os.path.splitext(file.filename)[0]) + '.jpg'
-            if scheduled_time:
-                temp_file_path = os.path.join(temp_dir, filename)
-            else:
-                temp_file_path = os.path.join(temp_dir, filename)
+            temp_file_path = os.path.join(temp_dir, filename)
 
             image.save(temp_file_path, 'JPEG', quality=90)
             logger.info('Saved processed image: %s', temp_file_path)
 
-            if scheduled_time:
-                image_url = url_for('static', filename=f'temp/{scheduled_folder}/{filename}', _external=True)
-            else:
-                image_url = url_for('static', filename=f'temp/{filename}', _external=True)
+            #if scheduled_time:
+            image_url = url_for('static', filename=f'temp/{folder_name}/{filename}', _external=True)
+            #else:
+            #    image_url = url_for('static', filename=f'temp/{filename}', _external=True)
             image_locations.append(image_url)
             logger.info('Appended image URL: %s', image_url)
 

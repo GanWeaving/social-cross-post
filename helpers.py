@@ -4,8 +4,19 @@ import os
 import glob
 from PIL import Image
 import logging
+import posthaven
+import bluesky
+import instagram
+import masto
+import twitter
+import facebook
+import inspect
+import time 
+from flask import url_for, flash
+import shutil
 
 logger = logging.getLogger()
+speed_logger = logging.getLogger('speed_logger')
 
 URL_PATTERN = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
 
@@ -105,3 +116,87 @@ def configure_logging():
     # Return both loggers
     return logger, speed_logger
 
+def try_posting(platform, action, post_data, message_format, *args):
+    start = time.time()
+    try:
+        logger.debug(message_format, ', '.join(post_data['image_locations']))
+        action(*args)
+        end = time.time()
+        speed_logger.info(f"{platform} post execution time: {end - start} seconds")
+        logger.debug(f'Posting to {platform} completed')
+        post_data['success_messages'].append(platform)
+    except Exception as e:
+        logger.error(f'Failed to post to {platform}. Error: %s', e)
+        post_data['error_messages'].append(platform)
+
+def send_post(post_data):
+    post_data['success_messages'] = []
+    post_data['error_messages'] = []
+
+    if post_data['enable_twitter']:
+        args = [post_data['image_locations'], post_data['processed_alt_texts'], post_data['text_mastodon']]
+        try_posting('Twitter', twitter.upload_to_twitter, post_data, 'Posting to Twitter: %s', *args)
+
+    if post_data['enable_mastodon']:
+        args = [post_data['subject'], post_data['text_mastodon'], post_data['image_locations'], post_data['processed_alt_texts']]
+        try_posting('Mastodon', masto.post_to_mastodon, post_data, 'Posting to Mastodon: %s', *args)
+
+    if post_data['enable_bluesky']:
+        bluesky.login_to_bluesky()
+        args = [post_data['text_mastodon'], post_data['image_locations'], post_data['processed_alt_texts']]
+        try_posting('Bluesky', bluesky.post_to_bluesky, post_data, 'Posting to Bluesky: %s images', *args)
+
+    if post_data['enable_posthaven']:
+        args = [post_data['subject'], post_data['text'], post_data['image_locations'], post_data['processed_alt_texts']]
+        try_posting('Posthaven', posthaven.send_email_with_attachments, post_data, 'Sending email: %s', *args)
+
+    if post_data['enable_facebook']:
+        args = [post_data['image_locations'], post_data['text_mastodon'], post_data['processed_alt_texts']]
+        try_posting('Facebook', facebook.post_to_facebook, post_data, 'Posting to Facebook: %s', *args)
+
+    if post_data['enable_instagram']:
+        args = [post_data['image_locations'], post_data['text']]
+        try_posting('Instagram', instagram.postInstagramCarousel, post_data, 'Posting to Instagram: %s', *args)
+
+    try:
+            logger.debug('Trying to delete media files')
+
+            # Extract directory from one of the image locations
+            directory = None
+            if post_data['image_locations']:
+                # Assume image_locations[0] is a URL that includes the base URL
+                # 'http://post.int0thec0de.xyz/' and replace it with ''
+                local_path = post_data['image_locations'][0].replace('http://post.int0thec0de.xyz/', '')
+                directory = os.path.dirname(local_path)
+
+            if directory:
+                shutil.rmtree(directory)
+                logger.debug(f'Deleted directory {directory}')
+                
+    except Exception as e:
+        error_message = f'Failed to delete media files. Error: {e}'
+        line_number = inspect.currentframe().f_lineno
+        logger.error(f'{error_message} (Line: {line_number})')
+
+    success_message = ''
+    if post_data['success_messages']:
+        success_message = f'Successfully posted to: {", ".join(post_data["success_messages"])}.'
+
+    error_message = ''
+    if post_data['error_messages']:
+        error_message = f'Failed to post to: {", ".join(post_data["error_messages"])}.'
+
+    if post_data.get('scheduled_time'):
+        if success_message and error_message:
+            logger.debug(f'{success_message} {error_message}')
+        elif success_message:
+            logger.debug(success_message)
+        elif error_message:
+            logger.debug(error_message)
+    else:
+        if success_message and error_message:
+            flash(f'{success_message} {error_message}')
+        elif success_message:
+            flash(success_message)
+        elif error_message:
+            flash(error_message)

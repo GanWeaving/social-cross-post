@@ -14,6 +14,7 @@
             <h2>My Own Little Cross-Poster (v.{{ version }})</h2>
             <textarea id="text" name="text" required oninput="updateCharacterCount()"></textarea><br>
             <p>Character count: <span id="characterCount">0</span></p>
+            <p id="warningMessage" style="display: none; color: red;">Character count exceeds 240!</p>
 
             <input type="file" id="files" name="files" multiple accept="image/*" onchange="handleFiles(this.files)"><br>
             <div id="fileList"></div>
