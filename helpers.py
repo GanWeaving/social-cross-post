@@ -1,28 +1,37 @@
+# Standard library imports
 import re
 import io
-import os
-import glob
-from PIL import Image
 import logging
+import time 
+import os
+import uuid
+import shutil
+from datetime import datetime
+
+# Third-party imports
+from PIL import Image
+import pytz
+from flask import url_for, flash, current_app
+import urllib.parse
+
+# Local application/library specific imports
 import posthaven
 import bluesky
 import instagram
 import masto
 import twitter
 import facebook
-import inspect
-import time 
-from flask import url_for, flash
-import shutil
+from extensions import db
+from models import ScheduledPosts
+
+URL_PATTERN = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
 
 logger = logging.getLogger()
 speed_logger = logging.getLogger('speed_logger')
 
-URL_PATTERN = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
-
 def strip_html_tags(text):
     return re.sub('<[^<]+?>', '', text)
-    
+
 def resize_image(image_file, max_size_kb=976.56, max_iterations=10):
     with Image.open(image_file) as img:
         img_format = 'JPEG'
@@ -30,23 +39,13 @@ def resize_image(image_file, max_size_kb=976.56, max_iterations=10):
             img_data = io.BytesIO()
             img.save(img_data, img_format)
             size_kb = len(img_data.getvalue()) / 1024
-
             if size_kb <= max_size_kb:
                 return img_data.getvalue()
-
             quality = int(max((1 - (size_kb - max_size_kb) / size_kb) * 100, 0))
             img.save(img_data, img_format, quality=quality)
-
         raise ValueError(f"Could not reduce image size below {max_size_kb}KB")
 
-def delete_images_from_static(processed_files):
-    for file_path, _ in processed_files:
-        try:
-            os.remove(file_path)
-            logger.info('Deleted file: %s', file_path)
-        except Exception as e:
-            logger.error(f'Failed to delete file {file_path}. Error: {e}')
-
+# URL and HTML processing
 def generate_facets_from_links_in_text(text):
     return [gen_link(*match.span(), match.group(0)) for match in URL_PATTERN.finditer(text)]
 
@@ -65,35 +64,22 @@ def gen_range(start, end, features):
         "features": features
     }
 
-def delete_media_files_in_directory(directory):
-    file_types = ['*.jpg', '*.png', '*.jpeg', '*.gif']
-    for file_type in file_types:
-        for file in glob.glob(os.path.join(directory, file_type)):
-            try:
-                os.remove(file)
-                logger.debug(f"Deleted file: {file}")
-            except Exception as e:
-                logger.error(f"Failed to delete file {file}. Error: {e}")
-
-
 def urls_to_html_links(text_html):
     url_format = '<a href="{}">{}</a>'
     url_matches = list(URL_PATTERN.finditer(text_html))
-
     for match in reversed(url_matches):
         url = match.group(0)
         start, end = match.span()
         text_html = text_html[:start] + url_format.format(url, url) + text_html[end:]
-
     return text_html
 
+# Logging
 def configure_logging():
     # Set up root logger
     logging.basicConfig(filename='app.log', 
-                        format='%(asctime)s %(levelname)s %(name)s %(message)s', 
+                        format='%(asctime)s %(levelname)s %(module)s:%(lineno)d %(message)s', 
                         datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.DEBUG)
-
     logging.getLogger("requests_oauthlib").setLevel(logging.WARNING)
     logging.getLogger("requests").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -104,87 +90,47 @@ def configure_logging():
     # Set up logging for speed measurements
     speed_logger = logging.getLogger('speed_logger')
     speed_logger.setLevel(logging.INFO)
-
     handler = logging.FileHandler('speed.log')
     handler.setLevel(logging.INFO)
-
     formatter = logging.Formatter('%(asctime)s - %(message)s')
     handler.setFormatter(formatter)
-
     speed_logger.addHandler(handler)
 
     # Return both loggers
     return logger, speed_logger
 
+# Posting Functions
 def try_posting(platform, action, post_data, message_format, *args):
     start = time.time()
     try:
-        logger.debug(message_format, ', '.join(post_data['image_locations']))
         action(*args)
         end = time.time()
         speed_logger.info(f"{platform} post execution time: {end - start} seconds")
-        logger.debug(f'Posting to {platform} completed')
         post_data['success_messages'].append(platform)
     except Exception as e:
         logger.error(f'Failed to post to {platform}. Error: %s', e)
         post_data['error_messages'].append(platform)
 
-def send_post(post_data):
-    post_data['success_messages'] = []
-    post_data['error_messages'] = []
-
-    if post_data['enable_twitter']:
-        args = [post_data['image_locations'], post_data['processed_alt_texts'], post_data['text_mastodon']]
-        try_posting('Twitter', twitter.upload_to_twitter, post_data, 'Posting to Twitter: %s', *args)
-
-    if post_data['enable_mastodon']:
-        args = [post_data['subject'], post_data['text_mastodon'], post_data['image_locations'], post_data['processed_alt_texts']]
-        try_posting('Mastodon', masto.post_to_mastodon, post_data, 'Posting to Mastodon: %s', *args)
-
-    if post_data['enable_bluesky']:
-        bluesky.login_to_bluesky()
-        args = [post_data['text_mastodon'], post_data['image_locations'], post_data['processed_alt_texts']]
-        try_posting('Bluesky', bluesky.post_to_bluesky, post_data, 'Posting to Bluesky: %s images', *args)
-
-    if post_data['enable_posthaven']:
-        args = [post_data['subject'], post_data['text'], post_data['image_locations'], post_data['processed_alt_texts']]
-        try_posting('Posthaven', posthaven.send_email_with_attachments, post_data, 'Sending email: %s', *args)
-
-    if post_data['enable_facebook']:
-        args = [post_data['image_locations'], post_data['text_mastodon'], post_data['processed_alt_texts']]
-        try_posting('Facebook', facebook.post_to_facebook, post_data, 'Posting to Facebook: %s', *args)
-
-    if post_data['enable_instagram']:
-        args = [post_data['image_locations'], post_data['text']]
-        try_posting('Instagram', instagram.postInstagramCarousel, post_data, 'Posting to Instagram: %s', *args)
-
+def send_to_platform(platform, send_func, *args):
+    start = time.time()
     try:
-            logger.debug('Trying to delete media files')
-
-            # Extract directory from one of the image locations
-            directory = None
-            if post_data['image_locations']:
-                # Assume image_locations[0] is a URL that includes the base URL
-                # 'http://post.int0thec0de.xyz/' and replace it with ''
-                local_path = post_data['image_locations'][0].replace('http://post.int0thec0de.xyz/', '')
-                directory = os.path.dirname(local_path)
-
-            if directory:
-                shutil.rmtree(directory)
-                logger.debug(f'Deleted directory {directory}')
-                
+        send_func(*args)
+        end = time.time()
+        speed_logger.info(f"{platform} upload execution time: {end - start} seconds")
+        logger.debug(f'Posting to {platform} completed')
+        return platform
     except Exception as e:
-        error_message = f'Failed to delete media files. Error: {e}'
-        line_number = inspect.currentframe().f_lineno
-        logger.error(f'{error_message} (Line: {line_number})')
+        logger.error(f'Failed to post to {platform}. Error: %s', e)
+        return None
 
+def log_and_flash_messages(post_data, success_messages, error_messages):
     success_message = ''
-    if post_data['success_messages']:
-        success_message = f'Successfully posted to: {", ".join(post_data["success_messages"])}.'
+    if success_messages:
+        success_message = f'Successfully posted to: {", ".join(success_messages)}.'
 
     error_message = ''
-    if post_data['error_messages']:
-        error_message = f'Failed to post to: {", ".join(post_data["error_messages"])}.'
+    if error_messages:
+        error_message = f'Failed to post to: {", ".join(error_messages)}.'
 
     if post_data.get('scheduled_time'):
         if success_message and error_message:
@@ -200,3 +146,139 @@ def send_post(post_data):
             flash(success_message)
         elif error_message:
             flash(error_message)
+
+def send_post(post_data):
+    platforms_to_funcs = {
+        'Twitter': (twitter.upload_to_twitter, [post_data['image_locations'], post_data['processed_alt_texts'], post_data['text_mastodon']]),
+        'Mastodon': (masto.post_to_mastodon, [post_data['subject'], post_data['text_mastodon'], post_data['image_locations'], post_data['processed_alt_texts']]),
+        'Bluesky': (bluesky.post_to_bluesky, [post_data['text_mastodon'], post_data['image_locations'], post_data['processed_alt_texts']]),
+        'Posthaven': (posthaven.send_email_with_attachments, [post_data['subject'], post_data['text'], post_data['image_locations'], post_data['processed_alt_texts']]),
+        'Facebook': (facebook.post_to_facebook, [post_data['image_locations'], post_data['text_mastodon'], post_data['processed_alt_texts']]),
+        'Instagram': (instagram.postInstagramCarousel, [post_data['image_locations'], post_data['text']]),
+    }
+
+    success_messages = []
+    error_messages = []
+
+    for platform, (send_func, args) in platforms_to_funcs.items():
+        if post_data[f'enable_{platform.lower()}']:
+            result = send_to_platform(platform, send_func, *args)
+            if result:
+                success_messages.append(result)
+            else:
+                error_messages.append(result)
+    
+    log_and_flash_messages(post_data, success_messages, error_messages)
+    
+    # New code to delete the temporary folder after posting images
+    for image_location in post_data['image_locations']:
+        # Parse the URL to get the path
+        url_path = urllib.parse.urlparse(image_location).path
+        # Remove the initial slash if there is one
+        if url_path.startswith('/'):
+            url_path = url_path[1:]
+        # Join the path to get the absolute path of the local directory
+        dir_path = os.path.join(os.getcwd(), url_path)
+        # Get the parent directory of the image file
+        parent_dir = os.path.dirname(dir_path)
+        # Remove the directory
+        if os.path.exists(parent_dir) and os.path.isdir(parent_dir):
+            shutil.rmtree(parent_dir)
+
+def create_subject(text):
+    now = datetime.now()
+    text_stripped = strip_html_tags(text)
+    text_preview = text_stripped[:10]
+    date_str = now.strftime('%Y/%m/%d')
+    subject = f'[{date_str}] {text_preview} ...'
+    return subject
+
+def convert_to_utc(time, timezone='Europe/Berlin'):
+    try:
+        tz = pytz.timezone(timezone)
+        return time.astimezone(pytz.utc)
+    except Exception as e:
+        logger.exception('Error occurred while converting scheduled time: %s', e)
+        return None
+    
+def save_post_to_database(post_data):
+    scheduled_time = post_data.get('scheduled_time')
+
+    if scheduled_time:
+        utc_scheduled_time = convert_to_utc(scheduled_time)
+        if utc_scheduled_time is None:
+            return
+
+        # Remove processed_files from the post_data
+        post_data.pop('processed_files', None)
+
+        post = ScheduledPosts(text=post_data.get('text'), scheduled_time=utc_scheduled_time, post_data=post_data)
+        try:
+            with db.session.begin():
+                db.session.add(post)
+            logger.info('Post saved to the database.')
+            flash('Post has been scheduled!')
+        except Exception as e:
+            logger.exception('Error occurred while saving post to the database: %s', e)
+            flash(f'Scheduling has failed! error: {e}')
+            return None
+
+        return post
+    else:
+        logger.info('Scheduled time is not provided. Posting immediately.')
+
+def process_files(app, files, alt_texts, new_names, scheduled_time):
+    
+    if not files or files[0].filename == '':
+        return [], [], []
+
+    processed_files = []
+    processed_alt_texts = []
+    image_locations = []
+    temp_dir = os.path.join(app.root_path, 'static/temp')
+
+        # If scheduled_time is not provided, use the current time
+    if not scheduled_time:
+        scheduled_time = datetime.now()
+
+    scheduled_folder = scheduled_time.strftime("%Y%m%d_%H%M%S")
+    temp_dir = os.path.join(temp_dir, scheduled_folder)
+    os.makedirs(temp_dir, exist_ok=True)
+
+    # Sort all lists by filenames
+    #files, alt_texts, new_names = zip(*sorted(zip(files, alt_texts, new_names), key=lambda x: x[0].filename))
+    # Sort all lists by new_names
+    files, alt_texts, new_names = zip(*sorted(zip(files, alt_texts, new_names), key=lambda x: x[2] if x[2] and x[2] != '' else x[0].filename))
+
+
+    for (file, alt_text, new_name) in zip(files, alt_texts, new_names):
+        try:
+            image = Image.open(file).convert("RGB")
+            
+            # If a new name has been entered, use it; otherwise, generate a random name.
+            if new_name and new_name != '':
+                filename = urllib.parse.quote(new_name) + '.jpg'
+            else:
+                filename = str(uuid.uuid4()) + '.jpg'
+                
+            temp_file_path = os.path.join(temp_dir, filename)
+
+            image.save(temp_file_path, 'JPEG', quality=90)
+
+            #if scheduled_time:
+            image_url = url_for('static', filename=f'temp/{scheduled_folder}/{filename}', _external=True)
+            #else:
+            #image_url = url_for('static', filename=f'temp/{filename}', _external=True)
+
+            image_locations.append(image_url)
+            logger.debug(f"Image locations: {image_locations}")
+
+            with open(temp_file_path, 'rb') as img_file:
+                processed_files.append((temp_file_path, resize_image(img_file)))
+            processed_alt_texts.append(alt_text)
+        
+        except Exception as e:
+            logger.error(f"Unable to process one of the attachments. Error: {e}")
+            raise
+
+    return processed_files, processed_alt_texts, image_locations

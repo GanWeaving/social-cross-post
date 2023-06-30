@@ -14,50 +14,40 @@ from flask_apscheduler import APScheduler
 from flask_sqlalchemy import SQLAlchemy
 from flask import g
 from sqlalchemy import inspect
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-from apscheduler.triggers.date import DateTrigger
+#from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+#from apscheduler.triggers.date import DateTrigger
 
 # Your Applications/Library specific modules
 import helpers
-import posthaven
-import bluesky
-import instagram
-import masto
-import twitter
-import facebook
 from config import Config, MYPASSWORD
+from models import ScheduledPosts
+from extensions import db
+from config import Config
 
-app = Flask(__name__)
-app.config.from_object(Config)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'  # this is where the SQLite database file will be stored
-app.config['SCHEDULER_JOBSTORES'] = {
-    'default': SQLAlchemyJobStore(url='sqlite:///jobs.db')
-}
-app.config['SCHEDULER_API_ENABLED'] = True
-
-db = SQLAlchemy(app)
-
-class ScheduledPosts(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    text = db.Column(db.Text, nullable=False)
-    scheduled_time = db.Column(db.DateTime, nullable=False)
-    post_data = db.Column(db.PickleType, nullable=False)
-    posted = db.Column(db.Boolean, default=False)  # New field 'posted' with default value False
-
-with app.app_context():
-    db.create_all()
-    inspector = inspect(db.engine)
-    table_exists = inspector.has_table(ScheduledPosts.__tablename__)
-    if table_exists:
-        print("ScheduledPosts table exists in the database.")
-    else:
-        print("ScheduledPosts table does not exist in the database.")
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object(Config)
     
+    # Initialize db with app
+    db.init_app(app)
+    
+    with app.app_context():
+        db.create_all()
+        inspector = inspect(db.engine)
+        table_exists = inspector.has_table(ScheduledPosts.__tablename__)
+        if table_exists:
+            print("ScheduledPosts table exists in the database.")
+        else:
+            print("ScheduledPosts table does not exist in the database.")
+
+    return app
+
+app = create_app()
+
+Session(app)
 
 # Setup logging
 logger, speed_logger = helpers.configure_logging()
-
-Session(app)
 
 # Scheduler object to allow scheduling of tasks
 scheduler = APScheduler()
@@ -222,7 +212,7 @@ def submit_form():
 
         # Schedule post for later
         with app.app_context():
-            post = save_post_to_database(post_data)  # Get the post object
+            post = helpers.save_post_to_database(post_data)  # Get the post object
             if post is None:
                 # If post is None, there was an error saving it to the database, so we skip scheduling the post
                 logger.error('Post could not be saved to the database, skipping scheduling.')
@@ -230,7 +220,7 @@ def submit_form():
             logger.debug('Post saved to the database')
 
             job_id = str(post.id)
-            scheduler.add_job(id=job_id, func='app:send_scheduled_post', args=[post.id], trigger='date', run_date=utc_dt)
+            scheduler.add_job(id=job_id, func='helpers:send_scheduled_post', args=[app, post.id], trigger='date', run_date=utc_dt)
             logger.debug('Scheduled post added to the job queue')
 
         logger.debug('Your post has been scheduled.')
@@ -242,84 +232,6 @@ def submit_form():
     speed_logger.info(f"OVERALL execution time: {end_time-start_time} seconds")
 
     return redirect(url_for('index'))
-
-def send_scheduled_post(post_id):
-    logger.debug('send_scheduled_post function triggered')
-
-    with app.app_context():
-        post = ScheduledPosts.query.get(post_id)
-
-        if not post or post.posted:
-            return
-
-        current_time = datetime.now(pytz.utc)
-        scheduled_time = post.scheduled_time
-        scheduled_time = scheduled_time.astimezone(pytz.utc)
-
-        if scheduled_time <= current_time:
-            post_data = post.post_data
-
-            logger.debug(f"Attempting to send Post {post.id}")
-            try:
-                helpers.send_post(post_data)
-                logger.debug(f"Post {post.id} has been successfully sent.")
-            except Exception as e:
-                logger.error(f"Error occurred while sending Post {post.id}: {str(e)}")
-                return
-
-            logger.debug(f"Attempting to delete Post {post.id} from the database")
-            try:
-                db.session.delete(post)
-                db.session.commit()
-                logger.debug(f"Post {post.id} has been posted and deleted from the database.")
-            except Exception as e:
-                logger.error(f"Error occurred while deleting Post {post.id} from the database: {str(e)}")
-                return
-
-            deleted_post = ScheduledPosts.query.get(post.id)
-            assert deleted_post is None, f"Post {post.id} has not been deleted from the database"
-
-            try:
-                scheduled_folder = scheduled_time.strftime("%Y%m%d_%H%M%S")
-                #temp_dir = os.path.join(app.root_path, 'static/temp', scheduled_folder)
-                #helpers.delete_media_files_in_directory(temp_dir)
-            except Exception as e:
-                error_message = f'Failed to delete media files. Error: {e}'
-                line_number = inspect.currentframe().f_lineno
-                logger.error(f'{error_message} (Line: {line_number})')
-        else:
-            logger.debug(f"Post {post.id} is not yet due to be posted.")
-
-def save_post_to_database(post_data):
-    scheduled_time = post_data.get('scheduled_time')
-
-    if scheduled_time:
-        try:
-            timezone = pytz.timezone('Europe/Berlin')
-            utc_scheduled_time = scheduled_time.astimezone(pytz.utc)
-        except Exception as e:
-            logger.exception('Error occurred while converting scheduled time: %s', e)
-            return
-
-        # Remove processed_files from the post_data
-        if 'processed_files' in post_data:
-            del post_data['processed_files']
-
-        post = ScheduledPosts(text=post_data.get('text'), scheduled_time=utc_scheduled_time, post_data=post_data)
-        try:
-            db.session.add(post)
-            db.session.commit()
-            logger.info('Post saved to the database.')
-            flash('Post has been scheduled!')
-        except Exception as e:
-            db.session.rollback()
-            logger.exception('Error occurred while saving post to the database: %s', e)
-            flash(f'Scheduling has failed! error: {e}')
-            return None
-
-        return post
-    else:
-        logger.info('Scheduled time is not provided. Posting immediately.')
 
 def process_files(files, alt_texts, scheduled_time):
     if not files or files[0].filename == '':
@@ -366,6 +278,7 @@ def process_files(files, alt_texts, scheduled_time):
             raise
 
     return processed_files, processed_alt_texts, image_locations
+
 
 
 if __name__ == "__main__":
