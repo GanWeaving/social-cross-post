@@ -1,12 +1,12 @@
 from tweepy import Client
 import json
 import requests
-import logging
 import helpers
 from requests_oauthlib import OAuth1
 from urllib.parse import urlparse
+import configLog
 
-logger = logging.getLogger()
+logger, speed_logger = configLog.configure_logging()
 
 # Load Twitter credentials from config.json
 with open("config.json", "r") as file:
@@ -29,27 +29,32 @@ client = Client(
 )
 
 def upload_to_twitter(image_locations, alt_texts, text):
-    if image_locations:
-        media_ids = []
-        for image_location, alt_text in zip(image_locations, alt_texts):
-            # Parse the URL and get the path
-            url_parts = urlparse(image_location)
-            local_file_path = url_parts.path[1:]  # Remove the leading '/'
+    try:
+        if image_locations:
+            media_ids = []
+            for image_location, alt_text in zip(image_locations, alt_texts):
+                # Parse the URL and get the path
+                url_parts = urlparse(image_location)
+                local_file_path = url_parts.path[1:]  # Remove the leading '/'
 
-            # Get media id
-            media_id = upload_local_image(local_file_path, twitter_config, alt_text)
-            media_ids.append(media_id)
-        
-        tweet_text = helpers.strip_html_tags(text)  # Customize as required
-        tweet_text = text.replace("[prompt in the alt]", "[prompts over on Bluesky & Mastodon]")  # Replace the string
-        res = client.create_tweet(text=tweet_text, media_ids=media_ids)
-        return res
-    else:
-        tweet_text = helpers.strip_html_tags(text)
-        tweet_text = text.replace("[prompt in the alt]", "[prompts over on Bluesky & Mastodon]")
-        res = client.create_tweet(text=tweet_text)
-        return res
+                # Get media id
+                media_id = upload_local_image(local_file_path, twitter_config, alt_text)
+                if not media_id:  # if media upload failed
+                    return False
+                media_ids.append(media_id)
+            
+            tweet_text = helpers.strip_html_tags(text)  # Customize as required
+            tweet_text = text.replace("[prompt in the alt]", "[prompts over on Bluesky & Mastodon]")  # Replace the string
+            res = client.create_tweet(text=tweet_text, media_ids=media_ids)
+        else:
+            tweet_text = helpers.strip_html_tags(text)
+            tweet_text = text.replace("[prompt in the alt]", "[prompts over on Bluesky & Mastodon]")
+            res = client.create_tweet(text=tweet_text)
+    except Exception as e:
+        logger.exception(f"Failed to post to Twitter. Error: {e}")
+        return False
 
+    return True if res else False  # Return True if the tweet is created successfully, False otherwise
 
 def upload_local_image(filepath, config, alt_text):
     # Endpoint URL
@@ -59,8 +64,8 @@ def upload_local_image(filepath, config, alt_text):
     try:
         files = {'media': open(filepath, 'rb')}
     except Exception as e:
-        logger.error(f"Failed to open file {filepath}. Exception: {e}")
-        raise
+        logger.exception(f"Failed to open file {filepath}. Exception: {e}")
+        return None
 
     #logger.debug(f'Opened file {filepath}.')
     
@@ -72,8 +77,8 @@ def upload_local_image(filepath, config, alt_text):
         response = requests.post(url, files=files, params=params, auth=auth)
         response.raise_for_status()
     except Exception as e:
-        logger.error(f"POST request failed. Exception: {e}")
-        raise
+        logger.exception(f"POST request failed. Exception: {e}")
+        return None
 
     logger.debug(f'POST request to {url} successful. HTTP status code: {response.status_code}')
 

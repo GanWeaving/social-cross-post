@@ -1,17 +1,17 @@
 # Standard library imports
 import re
 import io
-import logging
-import time 
 import os
 import uuid
+import time
 import shutil
+import logging.config
 from datetime import datetime
 
 # Third-party imports
 from PIL import Image
 import pytz
-from flask import url_for, flash, current_app
+from flask import url_for, flash
 import urllib.parse
 
 # Local application/library specific imports
@@ -21,13 +21,16 @@ import instagram
 import masto
 import twitter
 import facebook
+import configLog
 from extensions import db
 from models import ScheduledPosts
 
+from app import flask_app
+
 URL_PATTERN = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
 
-logger = logging.getLogger()
-speed_logger = logging.getLogger('speed_logger')
+# At the top level of helpers.py
+logger, speed_logger = configLog.configure_logging()
 
 def strip_html_tags(text):
     return re.sub('<[^<]+?>', '', text)
@@ -101,27 +104,15 @@ def configure_logging():
 
 # Posting Functions
 def try_posting(platform, action, post_data, message_format, *args):
-    start = time.time()
-    try:
-        action(*args)
-        end = time.time()
-        speed_logger.info(f"{platform} post execution time: {end - start} seconds")
-        post_data['success_messages'].append(platform)
-    except Exception as e:
-        logger.error(f'Failed to post to {platform}. Error: %s', e)
-        post_data['error_messages'].append(platform)
+    elapsed_time, _ = timed_execution(action, *args)
+    speed_logger.info(f"{platform} post execution time: {elapsed_time} seconds")
+    post_data['success_messages'].append(platform)
 
 def send_to_platform(platform, send_func, *args):
-    start = time.time()
-    try:
-        send_func(*args)
-        end = time.time()
-        speed_logger.info(f"{platform} upload execution time: {end - start} seconds")
-        logger.debug(f'Posting to {platform} completed')
-        return platform
-    except Exception as e:
-        logger.error(f'Failed to post to {platform}. Error: %s', e)
-        return None
+    elapsed_time, result = timed_execution(send_func, *args)
+    speed_logger.info(f"{platform} upload execution time: {elapsed_time} seconds")
+    logger.debug(f'Posting to {platform} completed')
+    return bool(result)
 
 def log_and_flash_messages(post_data, success_messages, error_messages):
     success_message = ''
@@ -164,9 +155,9 @@ def send_post(post_data):
         if post_data[f'enable_{platform.lower()}']:
             result = send_to_platform(platform, send_func, *args)
             if result:
-                success_messages.append(result)
+                success_messages.append(platform)
             else:
-                error_messages.append(result)
+                error_messages.append(platform)
     
     log_and_flash_messages(post_data, success_messages, error_messages)
     
@@ -227,17 +218,55 @@ def save_post_to_database(post_data):
     else:
         logger.info('Scheduled time is not provided. Posting immediately.')
 
-def process_files(app, files, alt_texts, new_names, scheduled_time):
-    
-    if not files or files[0].filename == '':
-        return [], [], []
 
-    processed_files = []
-    processed_alt_texts = []
-    image_locations = []
+def send_scheduled_post(post_id):
+    logger.debug('send_scheduled_post function triggered')
+
+    with flask_app.app_context():
+        post = ScheduledPosts.query.get(post_id)
+
+        if not post or post.posted:
+            return
+
+        current_time = datetime.now(pytz.utc)
+        scheduled_time = post.scheduled_time
+        scheduled_time = scheduled_time.astimezone(pytz.utc)
+
+        if scheduled_time <= current_time:
+            post_data = post.post_data
+
+            logger.debug(f"Attempting to send Post {post.id}")
+            try:
+                send_post(post_data)
+                logger.debug(f"Post {post.id} has been successfully sent.")
+            except Exception as e:
+                logger.error(f"Error occurred while sending Post {post.id}: {str(e)}")
+                return
+
+            logger.debug(f"Attempting to delete Post {post.id} from the database")
+            try:
+                db.session.delete(post)
+                db.session.commit()
+                logger.debug(f"Post {post.id} has been posted and deleted from the database.")
+            except Exception as e:
+                logger.error(f"Error occurred while deleting Post {post.id} from the database: {str(e)}")
+                return
+
+            deleted_post = ScheduledPosts.query.get(post.id)
+            assert deleted_post is None, f"Post {post.id} has not been deleted from the database"
+        else:
+            logger.debug(f"Post {post.id} is not yet due to be posted.")
+
+def timed_execution(function, *args, **kwargs):
+    start = time.time()
+    result = function(*args, **kwargs)
+    end = time.time()
+    return end - start, result
+
+def create_temp_dir(app, scheduled_time):
     temp_dir = os.path.join(app.root_path, 'static/temp')
 
-        # If scheduled_time is not provided, use the current time
+    # If scheduled_time is not provided, use the current time
     if not scheduled_time:
         scheduled_time = datetime.now()
 
@@ -245,30 +274,37 @@ def process_files(app, files, alt_texts, new_names, scheduled_time):
     temp_dir = os.path.join(temp_dir, scheduled_folder)
     os.makedirs(temp_dir, exist_ok=True)
 
-    # Sort all lists by filenames
-    #files, alt_texts, new_names = zip(*sorted(zip(files, alt_texts, new_names), key=lambda x: x[0].filename))
-    # Sort all lists by new_names
-    files, alt_texts, new_names = zip(*sorted(zip(files, alt_texts, new_names), key=lambda x: x[2] if x[2] and x[2] != '' else x[0].filename))
+    return temp_dir
 
+def process_files(app, files, alt_texts, new_names, scheduled_time):
+
+    if not files or files[0].filename == '':
+        return [], [], []
+
+    processed_files = []
+    processed_alt_texts = []
+    image_locations = []
+
+    temp_dir = create_temp_dir(app, scheduled_time)
+    files, alt_texts, new_names = sort_files_by_new_names(files, alt_texts, new_names)
+
+    files, alt_texts, new_names = sort_files_by_new_names(files, alt_texts, new_names)
 
     for (file, alt_text, new_name) in zip(files, alt_texts, new_names):
         try:
             image = Image.open(file).convert("RGB")
-            
+
             # If a new name has been entered, use it; otherwise, generate a random name.
             if new_name and new_name != '':
                 filename = urllib.parse.quote(new_name) + '.jpg'
             else:
                 filename = str(uuid.uuid4()) + '.jpg'
-                
+
             temp_file_path = os.path.join(temp_dir, filename)
 
             image.save(temp_file_path, 'JPEG', quality=90)
 
-            #if scheduled_time:
-            image_url = url_for('static', filename=f'temp/{scheduled_folder}/{filename}', _external=True)
-            #else:
-            #image_url = url_for('static', filename=f'temp/{filename}', _external=True)
+            image_url = url_for('static', filename=f'{temp_dir}/{filename}', _external=True)
 
             image_locations.append(image_url)
             logger.debug(f"Image locations: {image_locations}")
@@ -276,9 +312,13 @@ def process_files(app, files, alt_texts, new_names, scheduled_time):
             with open(temp_file_path, 'rb') as img_file:
                 processed_files.append((temp_file_path, resize_image(img_file)))
             processed_alt_texts.append(alt_text)
-        
+
         except Exception as e:
             logger.error(f"Unable to process one of the attachments. Error: {e}")
             raise
 
     return processed_files, processed_alt_texts, image_locations
+
+def sort_files_by_new_names(files, alt_texts, new_names):
+    return zip(*sorted(zip(files, alt_texts, new_names), 
+                  key=lambda x: x[2] if x[2] and x[2] != '' else x[0].filename))

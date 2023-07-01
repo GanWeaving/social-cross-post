@@ -3,11 +3,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-import logging
+import configLog
 from config import (FASTMAIL_USERNAME, FASTMAIL_PASSWORD, EMAIL_RECIPIENTS)
 from urllib.parse import urlparse
 
-logger = logging.getLogger()
+logger, speed_logger = configLog.configure_logging()
 
 def send_email_with_attachments(subject, body, image_locations, alt_texts):
     msg = MIMEMultipart()
@@ -35,6 +35,7 @@ def send_email_with_attachments(subject, body, image_locations, alt_texts):
 
             except Exception as e:
                 logger.exception(f"Unable to open one of the attachments. Error: {e}")
+                return False  # Return False if there is an error in attaching an image
 
     msg.attach(MIMEText(body, 'html'))  # Attach the body with alt text appended
 
@@ -48,5 +49,9 @@ def send_email_with_attachments(subject, body, image_locations, alt_texts):
             logger.info(f"Email sent successfully. Response: {e.smtp_error}")
         else:  # There was a problem
             logger.exception(f"Failed to send email. Error: {e.smtp_error}")
+            return False  # Return False if there is an error in sending the email
     except Exception as e:  # Some other exception occurred
         logger.exception(f"Failed to send email. Error: {e}")
+        return False  # Return False if there is an exception
+
+    return True  # Return True if the email is sent successfully

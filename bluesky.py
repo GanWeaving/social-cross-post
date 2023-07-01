@@ -1,11 +1,11 @@
 import helpers
-import logging
+import configLog
 from atproto import Client, models
 from datetime import datetime
 from config import (BLUESKY_EMAIL, BLUESKY_PASSWORD)
 from urllib.parse import urlparse
 
-logger = logging.getLogger()
+logger, speed_logger = configLog.configure_logging()
 
 client = Client()
 
@@ -20,7 +20,12 @@ def login_to_bluesky():
 from urllib.parse import urlparse
 
 def post_to_bluesky(text, image_locations, alt_texts):
-    login_to_bluesky()
+    try:
+        login_to_bluesky()
+    except Exception as e:
+        logger.error(f"Failed to log in to Bluesky: {e}")
+        return False
+
     text = helpers.strip_html_tags(text)
     logger.debug(f"Stripped text: {text}")
     
@@ -44,20 +49,25 @@ def post_to_bluesky(text, image_locations, alt_texts):
         except Exception as e:
             # Exception handling: log the error and local file path
             logger.exception(f"Unable to process the image file at {local_file_path} for Bluesky. Error: {e}")
-            raise
+            return False
 
     embed = models.AppBskyEmbedImages.Main(images=images) if images else None
     facets = helpers.generate_facets_from_links_in_text(text) if helpers.URL_PATTERN.search(text) else None
     logger.debug(f"Embed: {embed}, Facets: {facets}")
 
-    client.com.atproto.repo.create_record(
-        models.ComAtprotoRepoCreateRecord.Data(
-            repo=client.me.did,
-            collection='app.bsky.feed.post',
-            record=models.AppBskyFeedPost.Main(
-                createdAt=datetime.now().isoformat(), text=text, embed=embed, facets=facets
-            ),
+    try:
+        client.com.atproto.repo.create_record(
+            models.ComAtprotoRepoCreateRecord.Data(
+                repo=client.me.did,
+                collection='app.bsky.feed.post',
+                record=models.AppBskyFeedPost.Main(
+                    createdAt=datetime.now().isoformat(), text=text, embed=embed, facets=facets
+                ),
+            )
         )
-    )
-    logger.debug("Bluesky post created.")
+        logger.debug("Bluesky post created.")
+    except Exception as e:
+        logger.exception(f"Failed to create Bluesky post: {e}")
+        return False
 
+    return True

@@ -3,49 +3,70 @@ window.onload = function() {
         var fileList = document.getElementById('fileList');
         fileList.innerHTML = '';
         var files = document.getElementById('files').files;
-        for (var i = 0; i < files.length; i++) {
-            var div = document.createElement('div');
-            div.className = 'file-row';
 
-            var img = document.createElement('img');
-            img.classList.add('thumbnail');
-            img.file = files[i]
-            div.appendChild(img);
+        if (files.length > 1) {
+            for (var i = 0; i < files.length; i++) {
+                var div = document.createElement('div');
+                div.className = 'file-row';
 
-            var text = document.createTextNode(files[i].name);
-            div.appendChild(text);
+                var img = document.createElement('img');
+                img.classList.add('thumbnail');
+                img.file = files[i];
+                div.appendChild(img);
 
-            var input = document.createElement('input');
-            input.type = 'text';
-            input.name = 'new_name_' + i; // New filename input field
-            input.placeholder = 'New filename for ' + files[i].name; // Placeholder text
-            input.style.width = '25%';  // Set width to 50% of the parent width
-            div.appendChild(input);
-            
+                var label = document.createElement('label');   // Create a new 'label' HTML element
+                label.textContent = "Order position: ";        // Set its text content
+                div.appendChild(label);                        // Append it to the div
+                
+                var dropdown = document.createElement('select');
+                dropdown.name = 'new_name_' + i;
+                
+                for (var j = 1; j <= files.length; j++) {
+                    var option = document.createElement('option');
+                    option.value = j;
+                    option.text = j;
+                    if (j === (i+1)) { // Select the current index
+                        option.selected = true;
+                    }
+                    dropdown.appendChild(option);
+                }
+                
+                // Append dropdown after the label
+                div.appendChild(dropdown);
 
-            var altInput = document.createElement('textarea');
-            altInput.name = 'alt_text_' + i;
-            //altInput.placeholder = 'Alt text for ' + files[i].name;
-            altInput.placeholder = 'enter alt text here' 
-            altInput.style.resize = "none";
-            altInput.style.overflow = "hidden";
-            altInput.style.width = "100%";
-            altInput.onkeyup = function() {
-                this.style.height = "auto";
-                this.style.height = (this.scrollHeight) + "px";
-            };
-            div.appendChild(altInput);
+                // Hidden input to store the original extension
+                var extInput = document.createElement('input');
+                extInput.type = 'hidden';
+                extInput.name = 'original_ext_' + i;
+                // Get the extension from the original filename
+                extInput.value = files[i].name.split('.').pop();
+                div.appendChild(extInput);
 
-            fileList.appendChild(div);
+                div.appendChild(dropdown);
 
-            // Read the image file as a data URL and display it
-            var reader = new FileReader();
-            reader.onload = (function(aImg) {
-                return function(e) {
-                    aImg.src = e.target.result;
+                var altInput = document.createElement('textarea');
+                altInput.name = 'alt_text_' + i;
+                altInput.placeholder = 'enter alt text here';
+                altInput.style.resize = "none";
+                altInput.style.overflow = "hidden";
+                altInput.style.width = "100%";
+                altInput.onkeyup = function() {
+                    this.style.height = "auto";
+                    this.style.height = (this.scrollHeight) + "px";
                 };
-            })(img);
-            reader.readAsDataURL(files[i]);
+                div.appendChild(altInput);
+
+                fileList.appendChild(div);
+
+                // Read the image file as a data URL and display it
+                var reader = new FileReader();
+                reader.onload = (function(aImg) {
+                    return function(e) {
+                        aImg.src = e.target.result;
+                    };
+                })(img);
+                reader.readAsDataURL(files[i]);
+            }
         }
     }
 }
@@ -74,6 +95,28 @@ function updateCharacterCount() {
     } else {
         // Hide the warning
         document.getElementById('warningMessage').style.display = 'none';
+    }
+}
+
+function validateFileNames(event) {
+    var dropdowns = document.querySelectorAll("select[name^='new_name_']");
+    var values = new Set();
+    var hasDuplicate = false;
+
+    dropdowns.forEach(function (dropdown) {
+        var value = dropdown.value;
+        if (values.has(value)) {
+            hasDuplicate = true;
+        } else {
+            values.add(value);
+        }
+    });
+
+    if (hasDuplicate) {
+        var errorMessage = document.getElementById("errorMessage");
+        errorMessage.style.display = "block";
+        errorMessage.innerText = 'Order positions must be unique!';
+        event.preventDefault();  // stop form submission
     }
 }
 

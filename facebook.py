@@ -1,12 +1,12 @@
 import requests
 import json
-import logging
 import uuid
 from typing import List, Optional
 from config import (FB_ACCESS_TOKEN, FB_PAGE_ID)
 from concurrent.futures import ThreadPoolExecutor
+import configLog
 
-logger = logging.getLogger()
+logger, speed_logger = configLog.configure_logging()
 
 # Constants for Facebook URLs
 IMAGE_URL = f'https://graph.facebook.com/{FB_PAGE_ID}/photos'

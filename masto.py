@@ -1,9 +1,9 @@
 from mastodon import Mastodon
-import logging
+import configLog
 from urllib.parse import urlparse
 from config import (MASTODON_ACCESS_TOKEN, MASTODON_API_BASE_URL)
 
-logger = logging.getLogger()
+logger, speed_logger = configLog.configure_logging()
 
 def post_to_mastodon(subject, body, image_locations, alt_texts):
     mastodon = Mastodon(
@@ -25,9 +25,15 @@ def post_to_mastodon(subject, body, image_locations, alt_texts):
 
         except Exception as e:
             logger.exception(f"Unable to process one of the attachments for Mastodon. Error: {e}")
-            raise
+            return False  # Return False if there is an error in posting the image
 
-    if media_ids:  # Check if there are media attachments
-        mastodon.status_post(body, media_ids=media_ids)
-    else:
-        mastodon.status_post(body)
+    try:
+        if media_ids:  # Check if there are media attachments
+            mastodon.status_post(body, media_ids=media_ids)
+        else:
+            mastodon.status_post(body)
+    except Exception as e:
+        logger.exception(f"Unable to post the status to Mastodon. Error: {e}")
+        return False  # Return False if there is an error in posting the status
+
+    return True  # Return True if the post is successful

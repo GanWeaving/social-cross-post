@@ -10,7 +10,7 @@
 </head>
 <body>
     <div class="container">
-        <form action="/submit" method="POST" enctype="multipart/form-data" onsubmit="validateCheckboxes(event)">
+        <form action="/submit" method="POST" enctype="multipart/form-data" onsubmit="validateCheckboxes(event); validateFileNames(event)"">
             <h2>My Own Little Cross-Poster (v.{{ version }})</h2>
             <textarea id="text" name="text" required oninput="updateCharacterCount()"></textarea><br>
             <p>Character count: <span id="characterCount">0</span></p>

@@ -23,6 +23,7 @@ from config import Config, MYPASSWORD
 from models import ScheduledPosts
 from extensions import db
 from config import Config
+import configLog
 
 def create_app():
     app = Flask(__name__)
@@ -43,11 +44,12 @@ def create_app():
     return app
 
 app = create_app()
+flask_app = app
 
 Session(app)
 
 # Setup logging
-logger, speed_logger = helpers.configure_logging()
+logger, speed_logger = configLog.configure_logging()
 
 # Scheduler object to allow scheduling of tasks
 scheduler = APScheduler()
@@ -220,7 +222,7 @@ def submit_form():
             logger.debug('Post saved to the database')
 
             job_id = str(post.id)
-            scheduler.add_job(id=job_id, func='helpers:send_scheduled_post', args=[app, post.id], trigger='date', run_date=utc_dt)
+            scheduler.add_job(id=job_id, func='helpers:send_scheduled_post', args=[post.id], trigger='date', run_date=utc_dt)
             logger.debug('Scheduled post added to the job queue')
 
         logger.debug('Your post has been scheduled.')

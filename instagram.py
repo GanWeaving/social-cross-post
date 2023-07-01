@@ -4,8 +4,9 @@ import json
 import helpers
 from config import (INSTAGRAM_USER_ID, USER_ACCESS_TOKEN)
 from concurrent.futures import ThreadPoolExecutor
+import configLog
 
-logger = logging.getLogger()
+logger, speed_logger = configLog.configure_logging()
 
 ig_user_id = INSTAGRAM_USER_ID
 user_access_token = USER_ACCESS_TOKEN
@@ -22,11 +23,13 @@ def post_to_ig(endpoint, payload):
     url = f'{base_url}/{endpoint}'
     logging.debug(f"Posting to URL: {url} with payload: {payload}")
     r = requests.post(url, data=payload)
-    if check_response(r):
-        result = json.loads(r.text)
-        id = result.get('id')
-        logging.debug(f"Post response ID: {id}")
-        return id
+    if not check_response(r):  # if the request failed
+        return None  # return None to indicate failure
+    result = json.loads(r.text)
+    id = result.get('id')
+    logging.debug(f"Post response ID: {id}")
+    return id  # return the id if the request was successful
+
 
 def create_item_container(image_url):
     payload = {
@@ -69,8 +72,7 @@ def publish_carousel_container(creation_id):
 def postInstagramCarousel(image_locations, text):
     logger.info('postInstagramCarousel function called with image locations: %s and text: %s', image_locations, text)
     if len(image_locations) == 1:
-        postInstagramSingleImage(image_locations[0], text)
-        return
+        return postInstagramSingleImage(image_locations[0], text)
 
     # Create a ThreadPoolExecutor
     with ThreadPoolExecutor() as executor:
@@ -82,13 +84,18 @@ def postInstagramCarousel(image_locations, text):
     if children:
         carousel_id = create_carousel_container(children, text)
         if carousel_id:
-            publish_carousel_container(carousel_id)
+            return publish_carousel_container(carousel_id)
+
+    return False  # return False if the operation failed
+
 
 def postInstagramSingleImage(image_url, text):
     logger.info('postInstagramSingleImage function called with image URL: %s and text: %s', image_url, text)
     media_id = create_item_container_single_image(image_url, text)
     if media_id:
-        publish_single_image_container(media_id, text)
+        return publish_single_image_container(media_id, text)
+    return False  # return False if the operation failed
+
 
 def create_item_container_single_image(image_url, text):
     payload = {
