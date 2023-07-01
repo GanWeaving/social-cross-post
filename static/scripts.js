@@ -4,7 +4,7 @@ window.onload = function() {
         fileList.innerHTML = '';
         var files = document.getElementById('files').files;
 
-        if (files.length > 1) {
+        if (files.length > 0) {
             for (var i = 0; i < files.length; i++) {
                 var div = document.createElement('div');
                 div.className = 'file-row';
