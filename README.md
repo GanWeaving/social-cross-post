@@ -25,12 +25,26 @@ sudo apt install python3 python3-pip python3-venv nginx git
 
 ## Step 3: Clone the Repository
 
-Clone the "social-cross-post" repository from GitHub to your server:
+First, navigate to a directory where you want to store the application's files. In this example, we will create a new directory called myapps in the home directory, and then navigate into it:
+
+```sh
+Copy code
+cd ~
+mkdir myapps
+cd myapps
+```
+Now, within the myapps directory, clone the "social-cross-post" repository from GitHub to your server. This will create a new subdirectory named social-cross-post containing all the files from the repository:
 
 ```sh
 git clone https://github.com/GanWeaving/social-cross-post.git
+```
+Navigate into the newly created social-cross-post directory:
+
+```
 cd social-cross-post
 ```
+You're now in the directory containing the files of the "social-cross-post" application. All the following commands should be executed within this directory.
+
 ## Step 4: Set Up Virtual Environment
 
 Create a virtual environment and activate it:
