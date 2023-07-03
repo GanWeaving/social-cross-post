@@ -76,8 +76,24 @@ pip install -r requirements.txt
 
 ## Step 6: Configure the Application
 
-Get your API keys etc and save them into config.json
-
+Get your API keys etc and save them into the onfig.py file using these variable names (replace Fastmail with your own e-mail provider; the last 4 keys are Twitter-related):
+```
+BLUESKY_EMAIL
+BLUESKY_PASSWORD
+FB_ACCESS_TOKEN
+FB_PAGE_ID
+INSTAGRAM_USER_ID
+USER_ACCESS_TOKEN
+MASTODON_ACCESS_TOKEN
+MASTODON_API_BASE_URL
+FASTMAIL_USERNAME
+FASTMAIL_PASSWORD
+EMAIL_RECIPIENTS
+consumer_key
+consumer_secret
+access_token
+access_token_secret
+```
 * Bluesky: your username and an app password generated under 'settings' is enough 
 * Mastodon API: https://docs.joinmastodon.org/api/guidelines/
 * Twitter API: https://developer.twitter.com/en/products/twitter-api
