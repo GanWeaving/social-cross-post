@@ -76,7 +76,16 @@ pip install -r requirements.txt
 
 ## Step 6: Configure the Application
 
-Get your API keys etc and save them into the onfig.py file using these variable names (replace Fastmail with your own e-mail provider; the last 4 keys are Twitter-related):
+Get your API keys etc here:
+
+* Bluesky: your username and an app password generated under 'settings' is enough 
+* Mastodon API: https://docs.joinmastodon.org/api/guidelines/
+* Twitter API: https://developer.twitter.com/en/products/twitter-api
+* Instagram API: https://developers.facebook.com/products/instagram/apis/
+* Facebook Pages API: https://developers.facebook.com/docs/pages/
+* Posthaven: use the API of your e-mail provider
+
+And then save them into the config.py file using these variable names (replace Fastmail with your own e-mail provider; the 4 lowercase keys are Twitter-related):
 ```
 BLUESKY_EMAIL
 BLUESKY_PASSWORD
@@ -94,12 +103,18 @@ consumer_secret
 access_token
 access_token_secret
 ```
-* Bluesky: your username and an app password generated under 'settings' is enough 
-* Mastodon API: https://docs.joinmastodon.org/api/guidelines/
-* Twitter API: https://developer.twitter.com/en/products/twitter-api
-* Instagram API: https://developers.facebook.com/products/instagram/apis/
-* Facebook Pages API: https://developers.facebook.com/docs/pages/
-* Posthaven: use the API of your e-mail provider
+Also add this to your config.py file:
+```
+class Config(object):
+    SECRET_KEY = os.urandom(24)
+    SESSION_TYPE = 'filesystem'
+    VERSION = "1.0."
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///posts.db'
+    SCHEDULER_JOBSTORES = {
+        'default': SQLAlchemyJobStore(url='sqlite:///jobs.db')
+    }
+    SCHEDULER_API_ENABLED = True
+```
 
 ## Step 7: Start the Application with Gunicon
 
