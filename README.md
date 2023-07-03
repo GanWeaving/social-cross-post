@@ -62,9 +62,16 @@ pip install -r requirements.txt
 
 ## Step 6: Configure the Application
 
-Make sure that your Flask application (`app.py`) is properly configured. You might need to set environment variables, configure databases, etc.
+Get your API keys etc and save them into config.json
 
-## Step 7: Start the Application with Gunicorn
+Bluesky: your username and an app password generated under 'settings' is enough 
+Mastodon API: https://docs.joinmastodon.org/api/guidelines/
+Twitter API: https://developer.twitter.com/en/products/twitter-api
+Instagram API: https://developers.facebook.com/products/instagram/apis/
+Facebook Pages API: https://developers.facebook.com/docs/pages/
+Posthaven: use the API of your e-mail provider
+
+## Step 7: Start the Application with Gunicon
 
 Use Gunicorn as the WSGI server to serve the Flask app:
 
