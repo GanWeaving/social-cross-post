@@ -76,7 +76,7 @@ pip install -r requirements.txt
 
 ## Step 6: Configure the Application
 
-Get your API keys etc here:
+Get your API keys etc here (of course only those that you need, adapt the code accordingly):
 
 * Bluesky: your username and an app password generated under 'settings' is enough 
 * Mastodon API: https://docs.joinmastodon.org/api/guidelines/
