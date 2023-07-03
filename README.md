@@ -8,6 +8,8 @@ Cross-post to Bluesky, Mastodon, Posthaven, Instagram, Facebook and, ugh, Twitte
 
 ## Step 1: Set Up the Ubuntu Server
 
+(You can use Ubuntu on a physical computer, on a virtual machine or in the cloud (Amazon Lightsail etc))
+
 Start by ensuring your system is up to date:
 
 ```sh
