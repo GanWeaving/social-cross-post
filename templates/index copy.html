@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My Own Little Crossposter (Version {{ version }})</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+</head>
+<body>
+    <div class="container">
+        <form action="/submit" method="POST" enctype="multipart/form-data" onsubmit="validateCheckboxes(event)">
+            <h2>My Own Little Cross-Poster (v.{{ version }})</h2>
+            <textarea id="text" name="text" required oninput="updateCharacterCount()"></textarea><br>
+            <p>Character count: <span id="characterCount">0</span></p>
+            <p id="warningMessage" style="display: none; color: red;">Character count exceeds 240!</p>
+
+            <input type="file" id="files" name="files" multiple accept="image/*" onchange="handleFiles(this.files)"><br>
+            <div id="fileList"></div>
+
+            <input type="checkbox" id="hashtagCheckbox" name="hashtagCheckbox" checked onclick="updateCharacterCount()">
+            <label for="hashtagCheckbox">add hashtags?</label><br><br>
+            <input type="text" id="txt_hashtags" name="txt_hashtags" value="#midjourney #aiart #aiartcommunity" oninput="updateCharacterCount()">         
+            
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                <div>
+                    <input type="checkbox" id="chkBS" name="chkBS" checked onclick="hideErrorMessage();">
+                    <label for="chkBS">Bluesky</label>
+                </div>
+
+                <div>
+                    <input type="checkbox" id="chkMS" name="chkMS" checked onclick="hideErrorMessage();">
+                    <label for="chkMS">Mastodon</label>
+                </div>
+
+                <div>
+                    <input type="checkbox" id="chkPH" name="chkPH" checked onclick="hideErrorMessage();">
+                    <label for="chkPH">Posthaven</label>
+                </div>
+
+                <div>
+                    <input type="checkbox" id="chkIG" name="chkIG" checked onclick="hideErrorMessage();">
+                    <label for="chkIG">Instagram</label>
+                </div>
+
+                <div>
+                    <input type="checkbox" id="chkTW" name="chkTW" checked onclick="hideErrorMessage();">
+                    <label for="chkTW">Twitter</label>
+                </div>
+
+                <div>
+                    <input type="checkbox" id="chkFB" name="chkFB" checked onclick="hideErrorMessage();">
+                    <label for="chkFB">Facebook</label>
+                </div>
+            </div>
+
+            <input type="datetime-local" id="scheduleTime" name="scheduled_time" style="margin-bottom: 20px;"><br>
+
+            <div id="errorMessage" style="display: none; color: red; margin-bottom: 10px;"></div>
+            <input type="submit" id="submitButton" value="Submit">
+        </form>
+    </div>
+
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul class=flashes>
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+        {% endwith %}
+    </div>
+</body>
+</html>
